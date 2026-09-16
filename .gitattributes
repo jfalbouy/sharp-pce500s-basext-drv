@@ -1,0 +1,7 @@
+# Aucune conversion de fin de ligne : les fichiers destines a la machine
+# DOIVENT rester en CRLF (un LF seul donne « Line buffer overflow »), et les
+# listings sont compares a l'octet.
+* -text
+
+*.OBJ binary
+*.obj binary
