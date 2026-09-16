@@ -26,6 +26,11 @@
 000000                   	;    AVANT le premier bloc qui n'est pas un pilote, decalage des blocs suivants,
 000000                   	;    puis recalage de TEXT.BAS/DATA.BAS (linkbas).
 000000                   	;
+000000                   	; OU EST LE CODE DES MOTS-CLES : PAS ICI. Une seule ligne l'apporte,
+000000                   	;   « include ..\..\BASEXT\src\BASEXT.ASM », dans le bloc residant (bandeau
+000000                   	;   #### plus bas). Ce fichier n'ecrit que ce qui fait de ce code un pilote :
+000000                   	;   en-tetes, bd_arret, bd_reprise, installateur, desinstallateur.
+000000                   	;
 000000                   	; L'OBJET (charge en 0BE400h)
 000000                   	;   0BE400h  block_top    l'IMAGE du bloc, relogee puis copiee dans S1:
 000000                   	;            ...          bourrage jusqu'a 0BF000h
@@ -489,7 +494,17 @@
 0BE480 3C                	        popu    x
 0BE481 02 84 E4          	        jp      start                   ; start rend la main au BASIC (rc / retf)
 0BE484                   	
-0BE484                   	; -- le corps : les 14 mots-cles, le filtre, les tables, les variables --
+0BE484                   	; ############################################################################
+0BE484                   	; ##                                                                        ##
+0BE484                   	; ##   LE CODE DES 14 MOTS-CLES N'EST PAS ECRIT DANS CE FICHIER :           ##
+0BE484                   	; ##   IL EST INCLUS ICI, DEPUIS C:\Claude\BASEXT\src\BASEXT.ASM            ##
+0BE484                   	; ##                                                                        ##
+0BE484                   	; ##   start, LPEEK, WPEEK, LPOKE, MOD, INSTR, TRIM$, LTRIM$, RTRIM$,       ##
+0BE484                   	; ##   UCASE$, LCASE$, REPT$, SREPT$, XCONSOLE, XCLS, le filtre d'ecran,    ##
+0BE484                   	; ##   kw_table, disp_table et les variables : environ 2700 octets.         ##
+0BE484                   	; ##   Le code assemble se lit dans BASEXTDR.lst (sans -K).                 ##
+0BE484                   	; ##                                                                        ##
+0BE484                   	; ############################################################################
 0BE484                   	        include ..\..\BASEXT\src\BASEXT.ASM
 0BE484                   	; ============================================================================
 0BE484                   	; BASEXT.ASM -- le module d'extensions du BASIC
@@ -2434,6 +2449,9 @@
 0BEF14 00 00 00          	old_disp: db    0,0,0
 0BEF17                   	
 0BEF17                   	        end
+0BEF17                   	; ############################################################################
+0BEF17                   	; ##   FIN DU CODE INCLUS DEPUIS BASEXT.ASM                                 ##
+0BEF17                   	; ############################################################################
 0BEF17                   	block_bottom:
 0BEF17                   	
 0BEF17                   	; ============================================================================

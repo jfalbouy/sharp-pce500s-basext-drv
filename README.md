@@ -42,6 +42,36 @@ deux objets, qui sont deux **façons de l'installer**, et jamais deux extensions
 **On emploie l'un OU l'autre.** Le BASIC n'a qu'un crochet par table : si un `BASEXT.OBJ` est
 installé, l'installateur du pilote refuse (`Error: BASIC extension in use.`).
 
+### Où est le code des mots-clés dans `BASEXTDR.ASM`
+
+**Il n'y est pas écrit : une seule ligne l'apporte**, `include ..\..\BASEXT\src\BASEXT.ASM`, entre deux
+bandeaux `####`. À l'assemblage, XASM la remplace par tout `BASEXT.ASM`. Le reste du fichier est ce
+qui fait de ce code un pilote :
+
+| Partie de `BASEXTDR.ASM` | Contenu | Écrit où |
+|---|---|---|
+| `block_top` | en-tête de bloc (`0FBh`, `BASEXT  SYS`) et en-tête IOCS (`BEXT:`), entrée IOCS | ici |
+| `bd_arret` | rend le filtre d'écran et les crochets, pour la désinstallation | ici |
+| `bd_reprise` | remet le maillon `d_link` et les crochets (`CALL &xxxxx`) | ici |
+| **`include ..\..\BASEXT\src\BASEXT.ASM`** | **les 14 mots-clés, le filtre, `kw_table`, `disp_table`, les variables** | **`BASEXT/src`** |
+| `block_bottom` | fin du bloc résidant | ici |
+| `bd_entree` (`0BF000h`) | installateur, désinstallateur, messages | ici |
+| `include reloc.inc` | table de relocation | générée par `construire.py` |
+
+**Le code assemblé se lit dans `src/BASEXTDR.lst`**, que `construire.py` produit sans `-K` pour
+que le contenu inclus y figure en entier, commentaires compris. Exemples, relevés dans ce listing
+(les adresses changent à chaque modification : les relire, ne pas s'y fier de mémoire) :
+
+| Étiquette de BASEXT | Adresse dans l'image (chargée en `0BE400h`) | Décalage dans le bloc |
+|---|---|---|
+| `start` | `0BE484h` | `+084h` |
+| `lpeek` | `0BE4B6h` | `+0B6h` |
+| `xconsole` | `0BEAB3h` | `+6B3h` |
+| `kw_table` | `0BED69h` | `+969h` |
+
+Une fois l'image copiée dans `S1:`, chaque adresse devient **adresse du bloc + décalage**. Lors
+de l'essai du 2026-09-16, le bloc était en `080018h` : `LPEEK` en `0800CEh`, `kw_table` en `080981h`.
+
 **Une modification de `BASEXT.ASM` se reporte dans les deux** : réassembler `BASEXT.OBJ` dans
 `BASEXT/src`, puis relancer `outils/construire.py` ici, qui régénère aussi la table de relocation
 et `essais/DRVTEST.BAS`.

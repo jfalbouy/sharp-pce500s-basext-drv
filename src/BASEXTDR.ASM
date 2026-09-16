@@ -26,6 +26,11 @@
 ;    AVANT le premier bloc qui n'est pas un pilote, decalage des blocs suivants,
 ;    puis recalage de TEXT.BAS/DATA.BAS (linkbas).
 ;
+; OU EST LE CODE DES MOTS-CLES : PAS ICI. Une seule ligne l'apporte,
+;   « include ..\..\BASEXT\src\BASEXT.ASM », dans le bloc residant (bandeau
+;   #### plus bas). Ce fichier n'ecrit que ce qui fait de ce code un pilote :
+;   en-tetes, bd_arret, bd_reprise, installateur, desinstallateur.
+;
 ; L'OBJET (charge en 0BE400h)
 ;   0BE400h  block_top    l'IMAGE du bloc, relogee puis copiee dans S1:
 ;            ...          bourrage jusqu'a 0BF000h
@@ -138,8 +143,21 @@ bd_rp_present:
         popu    x
         jp      start                   ; start rend la main au BASIC (rc / retf)
 
-; -- le corps : les 14 mots-cles, le filtre, les tables, les variables --
+; ############################################################################
+; ##                                                                        ##
+; ##   LE CODE DES 14 MOTS-CLES N'EST PAS ECRIT DANS CE FICHIER :           ##
+; ##   IL EST INCLUS ICI, DEPUIS C:\Claude\BASEXT\src\BASEXT.ASM            ##
+; ##                                                                        ##
+; ##   start, LPEEK, WPEEK, LPOKE, MOD, INSTR, TRIM$, LTRIM$, RTRIM$,       ##
+; ##   UCASE$, LCASE$, REPT$, SREPT$, XCONSOLE, XCLS, le filtre d'ecran,    ##
+; ##   kw_table, disp_table et les variables : environ 2700 octets.         ##
+; ##   Le code assemble se lit dans BASEXTDR.lst (sans -K).                 ##
+; ##                                                                        ##
+; ############################################################################
         include ..\..\BASEXT\src\BASEXT.ASM
+; ############################################################################
+; ##   FIN DU CODE INCLUS DEPUIS BASEXT.ASM                                 ##
+; ############################################################################
 block_bottom:
 
 ; ============================================================================
