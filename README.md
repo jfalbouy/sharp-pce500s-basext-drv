@@ -92,8 +92,8 @@ suivants, recalage de `TEXT.BAS`/`DATA.BAS` (§5ter).
 - L'installateur **vérifie sa relocation sur la machine** avant de copier le bloc.
 - `BASEXT/src/BASEXT.ASM` est **incluable** (`def basext_pilote`) ; son module autonome reste
   identique à l'octet.
-- Défauts de xasm2026-4 signalés : `xasm2026-4/RAPPORT-BUG-rel-champ-adresse.md`,
-  `RAPPORT-BUG-octet-pre.md`.
+- Défauts de xasm2026-4 signalés (`xasm2026-4/RAPPORT-BUG-rel-champ-adresse.md`,
+  `RAPPORT-BUG-octet-pre.md`), ✅ **corrigés le 2026-09-17** et revérifiés ici (`CONCEPTION.md` §3.4).
 
 ## Essai sur l'émulateur
 
@@ -170,8 +170,10 @@ un autre dépôt. `construire.py` la régénère, assemble **sans `-K`** (avec `
 BASEXT perdrait ses commentaires dans le listing), puis vérifie tout. Code de sortie 1 au premier
 écart.
 
-⚠️ Le préfixe `rel` de xasm2026-4 produit aussi une table au format Kon, mais il se trompe de
-champ sur 14 formes (`CONCEPTION.md` §3.4) : on ne s'en sert pas.
+Le préfixe `rel` de xasm2026-4 produit aussi une table au format Kon. Faux sur 14 formes jusqu'au
+2026-09-16, ✅ corrigé le 2026-09-17 : sur BASEXT, sa table égale celle de `reloc.py`
+(`CONCEPTION.md` §3.4). BASEXT-DRV garde `reloc.py`, qui n'impose aucune marque dans la source
+de BASEXT.
 
 ## Règles de maintenance
 

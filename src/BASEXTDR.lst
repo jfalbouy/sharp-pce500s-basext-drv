@@ -2702,6 +2702,9 @@
 0BF184                   	;    (moteur C : 30 EA 05 0B), et l'ecriture partirait de (BP+0Bh). Voir
 0BF184                   	;    xasm2026-4/RAPPORT-BUG-octet-pre.md. Trois octets recrits un par un (un
 0BF184                   	;    champ de 2 octets recrit son 3e intact).
+0BF184                   	; ✅ CORRIGE dans xasm2026-4 le 2026-09-17 (commit 9e76984) et reverifie. Le
+0BF184                   	;    contournement est CONSERVE : c'est le code eprouve sur emulateur, et
+0BF184                   	;    revenir a mvp changerait l'objet.
 0BF184 30 80 0B          	        mv      a,(00BH)
 0BF187 B0 05             	        mv      [y],a
 0BF189 30 80 0C          	        mv      a,(00CH)

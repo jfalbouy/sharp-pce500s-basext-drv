@@ -22,11 +22,12 @@ meme dossier (les « include » relatifs restent valables), puis effacee. La
 source doit contenir exactement une directive org.
 
 La table s'ecrit par defaut au FORMAT KON (A62), celui qu'emet le prefixe
-« rel » de XASM et que lit l'installateur de PLINKC 1.62. On ne se sert pas de
-« rel » : mesure du 2026-09-16, XASM suppose le champ d'adresse en FIN
-d'instruction (NativeAssembler.cs), ce qui est faux pour « mv [!adr],(n) »,
-« mvp [!adr],(n) » (12 sites decales d'un octet dans BASEXT) et pour les sauts
-conditionnels proches « jpz/jpnz/jpc/jpnc » (pris sur 3 octets au lieu de 2).
+« rel » de XASM et que lit l'installateur de PLINKC 1.62. On ne s'est pas servi
+de « rel » : mesure du 2026-09-16, XASM supposait le champ d'adresse en FIN
+d'instruction, faux pour 14 formes sur 27 (xasm2026-4/RAPPORT-BUG-rel-champ-
+adresse.md). CORRIGE dans xasm2026-4 le 2026-09-17 et reverifie : sur BASEXT,
+la table « rel » egale celle de cet outil. Cet outil reste la voie de BASEXT-DRV
+(aucune marque dans la source du referent) et devient un VERIFICATEUR de « rel ».
 
 Usage :
   python reloc.py SOURCE.ASM [--debut SYM|HEX] [--fin SYM|HEX] [--inc reloc.inc]

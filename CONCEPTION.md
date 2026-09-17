@@ -176,6 +176,25 @@ terminateur. L'inventaire a révélé un défaut indépendant de `rel` :
 `xasm2026-4/RAPPORT-BUG-octet-pre.md` — `mvl (n),[lmn]` et `mvl [lmn],(n)` sous PRE sortent avec
 l'octet PRE **après** l'opcode ou l'adresse (moteur C : en tête). BASEXT n'emploie pas `mvl`.
 
+✅ **Corrigé dans xasm2026-4 le 2026-09-17** (commit `9e76984`, binaire `bin/` régénéré), et
+**revérifié ici indépendamment**, avec les sources d'essai du 2026-09-16 et le binaire livré :
+
+| Essai | Avant | Après |
+|---|---|---|
+| octet PRE : 158 lignes contre le moteur C | 27 lignes différentes (7 familles) | **0**, objets identiques à l'octet |
+| `rel mv a,05H` | accepté, table commençant par `0FFh` | **refusé** : « l'instruction ne porte aucune adresse absolue » |
+| `rel` sur 27 formes (`RELFORM.ASM`) | 14 entrées fausses | table **égale** aux champs mesurés ; objet relogé : 0 octet faux |
+| `rel` sur les 144 sites de BASEXT | 12 entrées décalées, 48 octets faux | 144 entrées **égales** à `reloc.py` ; objet relogé : **0 octet faux** |
+| `BASEXT.OBJ`, `BASEXTDR.OBJ` réassemblés | — | **identiques à l'octet** aux versions éprouvées (seule la date du `.UU` change) |
+
+xasm2026-4 a élargi la mesure : 2520 formes sous `pre_on` et `pre_off`, neuf défauts et 289
+divergences, tous corrigés (`xasm2026-4/PORTAGE.md`, 2026-09-17).
+
+**Conséquences pour BASEXT-DRV.** La décision D3 tient : `reloc.py` mesure les champs sans poser
+144 marques dans la source du référent. `rel` devient une **voie valable** pour un autre pilote,
+et `reloc.py` un moyen de la vérifier. Le contournement de `mvp [y],(00BH)` dans l'installateur
+est **conservé** : c'est le code éprouvé sur émulateur, et y revenir changerait l'objet.
+
 ---
 
 ## 4. Points ouverts — à trancher avant ou pendant l'écriture

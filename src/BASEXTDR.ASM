@@ -370,6 +370,9 @@ br_champ:
 ;    (moteur C : 30 EA 05 0B), et l'ecriture partirait de (BP+0Bh). Voir
 ;    xasm2026-4/RAPPORT-BUG-octet-pre.md. Trois octets recrits un par un (un
 ;    champ de 2 octets recrit son 3e intact).
+; ✅ CORRIGE dans xasm2026-4 le 2026-09-17 (commit 9e76984) et reverifie. Le
+;    contournement est CONSERVE : c'est le code eprouve sur emulateur, et
+;    revenir a mvp changerait l'objet.
         mv      a,(00BH)
         mv      [y],a
         mv      a,(00CH)

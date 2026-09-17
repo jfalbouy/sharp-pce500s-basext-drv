@@ -19,7 +19,8 @@ qui vit dans un autre depot : ne jamais assembler BASEXTDR.ASM seul) :
        octet par octet) redonne l'objet assemble a une autre origine ;
   5. le moteur C xasm2026-1-2, s'il est la, assemble la meme source : les
      objets doivent etre identiques (garde-fou contre un defaut d'encodage de
-     xasm2026-4, cf. RAPPORT-BUG-octet-pre.md). Un refus du moteur C est signale
+     xasm2026-4, cf. RAPPORT-BUG-octet-pre.md, corrige le 2026-09-17 ; le controle
+     reste). Un refus du moteur C est signale
      sans etre bloquant.
 """
 
