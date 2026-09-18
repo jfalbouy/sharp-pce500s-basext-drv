@@ -1,5 +1,7 @@
 # BASEXT-DRV — conception
 
+*Rédigé le 2026-09-16 — mis à jour le 2026-09-18*
+
 **Rendre BASEXT résident** : ses mots-clés vivent dans un **bloc de pilote** de `S1:` au lieu
 d'occuper la zone langage machine (`0BF000h`–`0BFC00h`), qui redevient libre pour d'autres
 programmes.

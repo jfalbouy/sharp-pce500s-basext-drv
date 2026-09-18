@@ -1,5 +1,7 @@
 # BASEXT-DRV — BASEXT résident, sous forme de pilote
 
+*Rédigé le 2026-09-16 — mis à jour le 2026-09-18*
+
 Les mots-clés de [BASEXT](../BASEXT) (`LPEEK`, `MOD`, `TRIM$`, `XCONSOLE`…) installés dans un
 **bloc de pilote** de `S1:` (`BASEXT.SYS`, device `BEXT:`), protégé comme un fichier `.SYS`, au
 lieu de la zone langage machine. Cette zone redevient libre pour d'autres programmes, qui peuvent
