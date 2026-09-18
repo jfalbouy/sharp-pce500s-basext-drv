@@ -78,7 +78,7 @@ et `essais/DRVTEST.BAS`.
 
 ## État
 
-**Version 0.2, 2026-09-16 : ✅ éprouvée sur émulateur — installation, bloc immobile, `BEXTTEST.BAS` 14/14. Zone réservée rendue (+ 6128 octets au BASIC), maillon et crochets intacts. Désinstallation éprouvée (crochets et maillon rendus). `OFF`/`ON`, zone à 0 et RESET sans effet sur le pilote.**
+**Version 0.2 : ✅ éprouvée sur PC-E500S réel le 2026-09-18**, avec `PLINK.SYS` déjà installé (insertion derrière lui, `BEXTTEST.BAS` OK, `ON`/`OFF` sans effet), après l'émulateur le 2026-09-16 (bloc immobile, zone rendue, soft RESET sans effet, désinstallation qui rend crochets et maillon).
 
 ⛔ **La version 0.1 est à proscrire** : elle ajoutait le bloc en fin de chaîne, derrière
 `DATA.BAS`, qui contient la mémoire libre ; au premier besoin de place du BASIC le bloc était
@@ -94,6 +94,14 @@ suivants, recalage de `TEXT.BAS`/`DATA.BAS` (§5ter).
   identique à l'octet.
 - Défauts de xasm2026-4 signalés (`xasm2026-4/RAPPORT-BUG-rel-champ-adresse.md`,
   `RAPPORT-BUG-octet-pre.md`), ✅ **corrigés le 2026-09-17** et revérifiés ici (`CONCEPTION.md` §3.4).
+
+## Porter l'objet sur le Sharp
+
+- **Par PLINKC**, si `PLINK.SYS` est installé (✅ éprouvé le 2026-09-18) : sur le Sharp,
+  `COPY "L:BASEXTDR.OBJ" TO "F:"`, puis `LOAD M "F:BASEXTDR.OBJ"`. Le fichier reste sur `F:` :
+  il resservira pour `CALL &BF000 "-U"` sans nouveau transfert.
+- **Par l'auto-décodeur** `src/BASEXTDR.UU`, un programme BASIC qui recrée `BASEXTDR.OBJ` sur `E:`
+  ou `F:` (c'est la voie employée sur l'émulateur).
 
 ## Essai sur l'émulateur
 
@@ -112,8 +120,9 @@ Partir d'une machine propre (RESET complet). Le fichier objet se range sur `X:` 
    Refus possibles, sans rien modifier : `already installed` (l'adresse est réaffichée),
    `BASIC extension in use`, `not enough memory`, `over two pages`, `block over loader`,
    `relocation check` (la relocation a mal tourné : rien n'a été copié), `LOAD M the .OBJ again`.
-3. `RUN` de `BLOCS.BAS` : `BASEXT  SYS` doit être **en tête**, à l'ancienne adresse de
-   `DATA.BAS`, et y **rester** aux `RUN` suivants.
+3. `RUN` de `BLOCS.BAS` : `BASEXT  SYS` doit être **en tête**, ou juste **derrière les pilotes
+   déjà présents** (`PLINK.SYS` par exemple), à l'ancienne adresse de `DATA.BAS`, et y **rester**
+   aux `RUN` suivants.
 4. Taper `1 REM ABCDEFGHIJ`, `RUN` : l'adresse de `BASEXT  SYS` ne doit **pas** changer.
 5. Charger `essais/DRVTEST.BAS`, `RUN` : `BLOC …`, `D_LINK : OK`, `CROCHETS : OK`.
 6. Seulement alors, charger `BASEXT/essais/BEXTTEST.BAS` : `*** 14/14 OK ***`. Ses `LPOKE &BFBF0`
@@ -139,6 +148,11 @@ KILL "S1:BASEXT.SYS"
 
 ⚠️ **Ne jamais `KILL` sans `CALL &BF000 "-U"` avant** : les crochets du BASIC et le filtre de
 `XCONSOLE` pointeraient dans de la mémoire libérée.
+
+⚠️ **Ne pas `KILL` un autre pilote installé AVANT BASEXT-DRV** (par exemple `PLINK.SYS`, placé
+sous lui dans `S1:`) tant que BASEXT-DRV est en place : le recompactage ferait descendre
+`BASEXT.SYS` sans relocation. D'abord désinstaller BASEXT-DRV, ensuite retirer l'autre pilote,
+puis réinstaller BASEXT-DRV (`CONCEPTION.md` §5ter).
 
 ## Arborescence
 

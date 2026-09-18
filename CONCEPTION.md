@@ -651,6 +651,44 @@ Rapporté par l'utilisateur : ni `OFF`/`ON`, ni la zone langage machine ramenée
 sans confirmation d'initialisation, précisé par J.-F. Albouy) : vraisemblablement l'initialisation
 de la mémoire, qui efface `S1:` de toute façon.
 
+### ✅ Sur PC-E500S réel, avec `PLINK.SYS` déjà installé (J.-F. Albouy, 2026-09-18)
+
+Premier essai hors émulateur, sur une machine où `PLINK.SYS` (PLINKC) occupait déjà `S1:`. C'est
+**par lui** que l'objet est arrivé : `COPY "L:BASEXTDR.OBJ" TO "F:"` depuis le PC (lecteur `L:` de
+PLINKC, serveur `APLINKS`), puis `LOAD M "F:BASEXTDR.OBJ"` et `CALL &BF000`. `PLINK.SYS` était donc
+chaîné et actif pendant l'installation.
+`BLOCS.BAS` après l'installation :
+
+| Bloc | Adresse | Attribut | Taille | Suivant = adresse + taille |
+|---|---|---|---|---|
+| `PLINK   SYS` | `080018h` | `25h` | 2336 | `080938h` ✓ |
+| **`BASEXT  SYS`** | **`080938h`** | `25h` | 2839 | `08144Fh` ✓ |
+| `DATA    BAS` | `08144Fh` | `20h` | 211 570 | `0B4EC1h` ✓ |
+| `TEXT    BAS` | `0B4EC1h` | `20h` | 650 | `0B514Bh` ✓ |
+| `FUNCKEY` | `0B514Bh` | `20h` | 104 | `0B51B3h` ✓ |
+| `AER` | `0B51B3h` | `20h` | 39 | `0B51DAh` = fin ✓ |
+
+Fin `0B51DAh`, `S1BTM` `0B51DBh` ; `TXT B4EC1`, `DAT 8144F`. Puis `BEXTTEST.BAS` : tout passe ;
+`ON`/`OFF` sans effet ; aucun plantage.
+
+Ce que cela établit, en plus de l'émulateur :
+
+- **la règle d'insertion** (étape 5 de l'installateur) sur un cas qu'on n'avait pas eu : le pilote
+  déjà présent (attribut `25h`, bits `0Ch`) est **sauté**, et `BASEXT.SYS` prend la place de
+  `DATA.BAS`, **derrière `PLINK.SYS`** ;
+- **la cohabitation** avec PLINKC : deux pilotes dans `d_link`, et une extension BASIC ;
+- **le matériel réel** : relocation, décalage des blocs et recalage du BASIC s'y comportent comme
+  sur PockEmul. `PLINK.SYS` fait bien 2336 octets, le `blen` lu dans `plinkc.a62.lst`.
+
+⚠️ **La limite du §4.3 devient concrète sur cette machine.** `PLINK.SYS` est **sous**
+`BASEXT.SYS`. Un `KILL "S1:PLINK.SYS"` recompacterait `S1:` et ferait **descendre** notre bloc de
+2336 octets, sans relocation : crochets, `d_link` et filtre désigneraient l'ancienne adresse.
+Déduit du modèle (le `KILL` recompacte, comme l'a montré la désinstallation), **non mesuré**, et à
+ne pas mesurer sur le vrai Sharp. **Ordre à suivre** : désinstaller BASEXT-DRV
+(`CALL &BF000 "-U"`, `SET`, `KILL`), retirer `PLINK.SYS`, puis réinstaller BASEXT-DRV. Dans
+l'autre sens, rien à craindre : un pilote installé **après** BASEXT-DRV par le même modèle se place
+derrière lui.
+
 ⚠️ **Limite connue, commune avec PLINKC** : un pilote inséré **sous** le nôtre puis supprimé par
 `KILL` ferait descendre notre bloc, sans relocation (§4.3).
 
@@ -664,7 +702,7 @@ de la mémoire, qui efface `S1:` de toute façon.
 | 2 | ✅ §4.1 tranché (refus) ; §4.2 mesuré : `OFF`/`ON`, zone à 0 et RESET conservent maillon et crochets | §5ter |
 | 3 | ✅ 0.1 écrite ; ⛔ ajout en fin, le bloc bouge (§5bis) ; ✅ 0.2 écrite et éprouvée sur émulateur (§5ter) | installation, bloc immobile, `DRVTEST` OK, `BEXTTEST` 14/14 |
 | 4 | ✅ Zone réservée rendue ; petit reset, `OFF`/`ON`, zone à 0, RESET : maillon et crochets conservés (§5ter) | `S1BTM` + 6128 ; `DRVTEST` OK |
-| 5 | `KILL` d'un pilote installé **sous** le nôtre (§4.3) | comportement mesuré et écrit (limite connue, commune avec PLINKC) |
+| 5 | ✅ **PC-E500S réel**, avec `PLINK.SYS` déjà installé (§5ter) : insertion derrière `PLINK.SYS`, `BEXTTEST` OK, `ON`/`OFF` OK ; ⚠️ `KILL` d'un pilote **sous** le nôtre : non mesuré, ordre de retrait documenté | |
 | 6 | ✅ Désinstallation puis `SET`/`KILL` (§5ter) | `d_link` `DF820`, crochets `FFFFF` ; bloc retiré, `DATA.BAS` en tête, BASIC recalé |
 | 7 | Dépôt GitHub | poussé |
 
