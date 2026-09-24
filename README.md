@@ -1,6 +1,6 @@
 # BASEXT-DRV — BASEXT résident, sous forme de pilote
 
-*Rédigé le 2026-09-16 — mis à jour le 2026-09-18*
+*Rédigé le 2026-09-16 — mis à jour le 2026-09-24*
 
 Les mots-clés de [BASEXT](../BASEXT) (`LPEEK`, `MOD`, `TRIM$`, `XCONSOLE`…) installés dans un
 **bloc de pilote** de `S1:` (`BASEXT.SYS`, device `BEXT:`), protégé comme un fichier `.SYS`, au
@@ -161,6 +161,8 @@ puis réinstaller BASEXT-DRV (`CONCEPTION.md` §5ter).
 ```
 BASEXT-DRV/
 ├── README.md             ce fichier
+├── LICENSE               PolyForm Noncommercial 1.0.0
+├── NOTICE.md             droits d'auteur, licences et credits
 ├── CONCEPTION.md         decisions, mesures, versions 0.1 et 0.2, plan
 ├── src/
 │   ├── BASEXTDR.ASM      le pilote (inclut ..\..\BASEXT\src\BASEXT.ASM)
@@ -200,3 +202,11 @@ de BASEXT.
   adresse absolue (`CONCEPTION.md` §3.2).
 - `reloc.inc` et `pce500.inc` sont **générés** : ils ne s'éditent pas.
 - Fichiers `.BAS` pour la machine : CRLF et MAJUSCULES ASCII ; noms de fichier Sharp en 8.3.
+
+## Licence
+
+**PolyForm Noncommercial License 1.0.0** ([`LICENSE`](LICENSE)) — usage non commercial. Le code de
+ce dépôt est original, mais son installateur **dérive** du `DRIVER_TEMPLATE` de `XASM2026-4`
+(généralisé à partir de REGISTER2, E. Kako) et du modèle d'installation de PLINKC 1.62
+(D. Mizobata, d'après PLINK de N. Kon), des freewares « pas d'usage commercial ». Aucun octet de
+ces œuvres n'est distribué ici : l'inventaire est dans [`NOTICE.md`](NOTICE.md).
