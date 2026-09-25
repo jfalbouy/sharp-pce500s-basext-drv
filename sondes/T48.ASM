@@ -35,6 +35,14 @@
 ;   0BFBF0h  3 octets  adresse du bloc cree (Y rendu), 0FFFFFh si refus
 ;   0BFBF3h  1 octet   code d'erreur rendu dans A, 0 si succes
 ;   0BFBF4h  1 octet   1 si la retenue etait armee au retour, 0 sinon
+;   0BFBF5h  3 octets  SIGNATURE 'T48', ecrite en dernier
+;
+; ⛔ LA SIGNATURE N'EST PAS UN ORNEMENT. La premiere version se fiait a « zone a
+;    zero = sonde pas encore appelee » : la zone langage machine n'est PAS remise
+;    a zero, et le releve du 2026-09-25 a donc affiche « BLOC CREE EN 9F9F00 »
+;    AVANT le moindre appel -- de la memoire quelconque, lue comme un resultat.
+;    T48.BAS efface la signature apres l'avoir lue : ce qu'il affiche vient donc
+;    toujours du dernier appel, et de lui seul.
 ; ============================================================================
 
         include pce500.inc
@@ -42,6 +50,7 @@
 res_adr:        equ     0BFBF0H         ; hors du module, dans la zone reservee
 res_err:        equ     0BFBF3H
 res_carry:      equ     0BFBF4H
+res_sig:        equ     0BFBF5H
 
 taille:         equ     000100H         ; 256 octets demandes, en-tete comprise
 
@@ -63,19 +72,28 @@ start:
         jrc     echec
 
         mv      [res_adr],y             ; Y = adresse du bloc cree
-        rc                              ; retour propre a BASIC
-        retf
+        jr      fini
 
 echec:
         mv      [res_err],a             ; code d'erreur du device
         mv      a,001H
         mv      [res_carry],a
+
+fini:
+        mv      x,sig                   ; signature 'T48' : la reponse vient de CET appel
+        mv      y,res_sig
+        mv      il,003H
+sig_cp: mv      a,[x++]
+        mv      [y++],a
+        dec     il
+        jrnz    sig_cp
         rc                              ; la sonde rend TOUJOURS la main proprement
         retf
 
 ; Le nom occupe 11 octets, 8 + 3, complete par des espaces -- le format des
 ; en-tetes de bloc (DRVTEST.BAS lit 11 caracteres en +1).
 nom:    db      'T48     SYS'
+sig:    db      'T48'
 
 btm:
         assert  btm-start < 0100H       ; la sonde reste loin de res_adr

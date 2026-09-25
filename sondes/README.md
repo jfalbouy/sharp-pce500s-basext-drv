@@ -84,6 +84,62 @@ tombe pas au milieu de l'exécution du programme qui vit, lui, dans `TEXT.BAS`.
 | refus, code d'erreur dans `0BFBF3h` | lire le code dans `04-fcs-iocs.md` §2.2 ; un refus « pas de place » signifierait que `47h` reste nécessaire avant |
 | le bloc apparaît **ailleurs** qu'en tête | le carnet et la ROM se lisent autrement qu'on l'a cru : garder la mesure, corriger le référentiel |
 
+### ✅ Résultat — PC-E500S réel, J.-F. Albouy, 2026-09-25
+
+**`48h` a refusé : `REFUS : ERR C CY 1`** — erreur `0Ch`, retenue armée, et **rien n'a bougé**.
+
+| Relevé | Avant | Après |
+|---|---|---|
+| chaîne de `S1:` | `80018` PLINK SYS 25 2336 · `80938` BASEXT SYS 25 2839 · `8144F` DATA BAS 20 240798 · `BC0ED` TEXT BAS 20 1119 · `BC54C` FUNCKEY · `BC5B4` AER | la même, aux deux octets que le BASIC déplace de `TEXT` vers `DATA` près |
+| `FIN` / `S1BTM` | `BC61A` / `BC61B` | `BC61A` / `BC61B` |
+| `TXT` / `DAT` | `BC0EF` / `8144F` | `BC0EF` / `8144F` |
+| `[(iocsw)+3Ah]` | `0` | `0` |
+
+**Pourquoi, et c'est la ROM qui le dit.** Le traitement commence par `call SUB_F0244`, qui rend
+dans `Y` **l'espace libre après la chaîne** (`[s1_btm]` − fin de chaîne) — écrasant au passage la
+taille qu'on lui a passée. Vient ensuite `sub y,22h` / `jrc LOC_F040E`, et `LOC_F040E` fait
+`mv a,00Ch`. Or la chaîne est **jointive et complète** : `S1BTM` − `FIN` = **1 octet**. Donc
+`1 − 34` emprunte, et la commande rend `0Ch`. Le carnet confirme le sens du code : pour la commande
+voisine `45h`, il documente « erreur a = `009h` nom déjà pris, **`00Ch` mémoire insuffisante** ».
+
+**Ce que la mesure établit :**
+
+1. ✅ **`47h` condense avant `48h` est obligatoire**, et pas seulement prudent. La place libre
+   n'est jamais « après la chaîne » sur une machine en ordre de marche : `DATA.BAS` la détient
+   toute (`Referentiel … 03` §7bis). Notre installateur compacte déjà d'abord — il avait raison.
+2. ✅ **Un refus de `48h` ne casse rien** : chaîne, `TXT`/`DAT` et drapeau identiques. La commande
+   vérifie avant d'agir.
+3. ⚠️ **Le carnet prête à `48h` un paramètre que la ROM n'utilise pas.** Il annonce « `Y` = taille » ;
+   or `Y` est écrasé par `SUB_F0244` dès la deuxième instruction, la chaîne n'est décalée que de
+   **`22h` octets**, et le gabarit écrit donne une taille de `22h` et un attribut **`20h`**.
+   📖 Lecture : `48h` crée un bloc **vide** en tête, et la taille se donnerait ensuite par **`42h`
+   `block_resize`** (`(ch)` = lecteur, `a` = 0/1, `X` = nom, `Y` = taille ; erreurs `000h` carte
+   protégée, `005h` bloc protégé, `00Ch` mémoire insuffisante, et `Y` = taille possible).
+
+**Conséquence pour l'installateur** : la voie ROM complète serait `47h` → `48h` → `42h`, plus la
+pose de l'attribut `25h`. Elle remplacerait notre montée des blocs à la main, pas le reste. Tant
+qu'elle n'est pas mesurée, **l'installateur ne bouge pas**.
+
+### T48 v2 — ce qu'il reste à mesurer
+
+⛔ **Une v2 ne peut pas se contenter d'ajouter `47h`.** Le compactage déplace `TEXT.BAS` et
+`DATA.BAS` : une sonde qui compacte **doit** recaler `(txtbas)`/`(datbas)` derrière elle, comme le
+fait `bd_linkbas` sur **tous** les chemins, sans quoi le programme BASIC qui l'a appelée perd ses
+propres blocs. C'est la raison d'être de la v2, et sa principale difficulté.
+
+Elle mesurerait, dans l'ordre : `47h`, puis `48h` (adresse rendue, position dans la chaîne), puis
+`42h` à 2839 octets (taille obtenue, déplacement des blocs suivants), puis l'état de `TXT`/`DAT` et
+du drapeau `[(iocsw)+3Ah]` — la question restée ouverte : la ROM recale-t-elle le BASIC, ou compte-
+t-elle sur le drapeau pour le faire retrouver plus tard ?
+
+### ⛔ Ce que la première version de la sonde a raté
+
+`T48.BAS` tenait « zone de résultat à zéro » pour « sonde pas encore appelée ». La zone langage
+machine n'est pas remise à zéro : le relevé **avant** appel a donc affiché `BLOC CREE EN 9F9F00`,
+de la mémoire quelconque lue comme un résultat. La sonde écrit désormais une **signature `T48`**
+en `0BFBF5h`, que le BASIC efface après l'avoir lue : ce qui s'affiche vient du dernier appel, et
+de lui seul.
+
 Quoi qu'il arrive, le résultat va dans
 `Referentiel PC-E500S SC62015/03-memoire-et-systeme-pc-e500s.md` §7bis, qui porte aujourd'hui la
 question, et dans `CONCEPTION.md` §4.1 s'il change l'installateur.
