@@ -1,6 +1,6 @@
 # BASEXT-DRV — BASEXT résident, sous forme de pilote
 
-*Rédigé le 2026-09-16 — mis à jour le 2026-09-24*
+*Rédigé le 2026-09-16 — mis à jour le 2026-09-25*
 
 Les mots-clés de [BASEXT](../BASEXT) (`LPEEK`, `MOD`, `TRIM$`, `XCONSOLE`…) installés dans un
 **bloc de pilote** de `S1:` (`BASEXT.SYS`, device `BEXT:`), protégé comme un fichier `.SYS`, au
@@ -171,7 +171,11 @@ BASEXT-DRV/
 │   └── pce500.inc        constantes systeme, GENEREES (copie de BASEXT/src)
 ├── essais/
 │   ├── DRVTEST.BAS       etat du pilote, GENERE par construire.py (PEEK seulement)
-│   └── BLOCS.BAS         la chaine des blocs de S1: (PEEK seulement)
+│   ├── BLOCS.BAS         la chaine des blocs de S1: (PEEK seulement)
+│   └── KILLSOUS.BAS      KILL d'un pilote installe SOUS le notre (CONCEPTION §4.3)
+├── sondes/
+│   ├── T48.ASM/.BAS      la commande IOCS 48h cree-t-elle un bloc en tete ?
+│   └── README.md         ce que la ROM en dit, le protocole, comment lire le resultat
 └── outils/
     ├── construire.py     table, assemblage, controles, moteur C
     └── reloc.py          mesure et verification de la table de relocation

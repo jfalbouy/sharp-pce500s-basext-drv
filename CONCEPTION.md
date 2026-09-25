@@ -1,6 +1,6 @@
 # BASEXT-DRV — conception
 
-*Rédigé le 2026-09-16 — mis à jour le 2026-09-18*
+*Rédigé le 2026-09-16 — mis à jour le 2026-09-25*
 
 **Rendre BASEXT résident** : ses mots-clés vivent dans un **bloc de pilote** de `S1:` au lieu
 d'occuper la zone langage machine (`0BF000h`–`0BFC00h`), qui redevient libre pour d'autres
@@ -240,6 +240,40 @@ dans la ROM. Même relogé par l'OS, le bloc laisserait **trois pointeurs extér
 le lien dans `d_link`, les deux crochets du BASIC, et l'entrée du handle 0 si le filtre de
 `XCONSOLE` est branché. **À mesurer sur émulateur** : installer, `KILL` un bloc antérieur,
 relire l'adresse du bloc.
+
+#### Le protocole, et pourquoi il tient en un seul `RUN` — `essais/KILLSOUS.BAS`
+
+⛔ **On ne peut pas mesurer ceci en tapant quoi que ce soit après le `KILL`.** Si le bloc descend,
+les crochets du BASIC désignent une table déplacée, et **la tokenisation de la première ligne
+tapée ou chargée lit cette table périmée** — c'est exactement ce qui a arrêté PockEmul à la
+version 0.1 (§5bis). Charger un programme de relevé *après* le `KILL` serait donc le meilleur moyen
+de perdre la mesure.
+
+D'où `essais/KILLSOUS.BAS`, qui fait tout dans **un seul `RUN`**, sans aucun mot-clé d'extension
+(`PEEK`/`POKE` seulement, pour rester lisible même crochets perdus) :
+
+1. il retrouve `BASEXT  SYS` **et** `PLINK   SYS` dans la chaîne des blocs, et refuse de continuer
+   si PLINK est **au-dessus** de nous (il n'y aurait rien à mesurer) ;
+2. il relève les **décalages** des deux crochets dans le bloc (`crochet − bloc`), plutôt que de les
+   coder en dur : ils restent justes quelle que soit la version de BASEXT ;
+3. il fait lui-même `SET` puis `KILL "S1:PLINK.SYS"` ;
+4. il retrouve le bloc, dit s'il a bougé et de combien, et si les crochets ont suivi ;
+5. **s'ils ne l'ont pas suivi, il les réécrit** aux nouvelles adresses (`POKE`, avec les décalages
+   du point 2) et rechaîne au besoin notre en-tête en tête de `d_link` — la machine redevient donc
+   saine avant qu'on retape quoi que ce soit ;
+6. il affiche pour finir les crochets, `d_link`, `(txtbas)`/`(datbas)` et l'adresse de reprise
+   (`bloc + 57h`) au cas où.
+
+⚠️ Il ne rétablit **pas** le filtre d'écran de `XCONSOLE` : faire `XCONSOLE` (sans argument) avant
+l'essai, ou accepter que le filtre soit à débrancher ensuite par `CALL` de la reprise.
+
+Trois résultats possibles, et chacun est une réponse :
+
+| Relevé | Ce qu'il établit |
+|---|---|
+| `BLOC IMMOBILE` | la ROM ne recompacte pas au `KILL` : la limite du §4.3 n'existe pas, et le point 5 du plan se clôt |
+| `BLOC DESCENDU DE n` + `CROCHETS SUIVIS` | la ROM relogerait le bloc **et** ses pointeurs extérieurs — très improbable, à recouper avec `d_link` |
+| `BLOC DESCENDU DE n` + `CROCHETS PERIMES` | la limite est **réelle et mesurée** : à écrire dans le `README` comme condition d'emploi (désinstaller avant de retirer un pilote installé sous le nôtre), et la réparation est faite par le programme lui-même |
 
 ### 4.4 ⚠️ Un BASEXT déjà installé en `0BF000h`
 
