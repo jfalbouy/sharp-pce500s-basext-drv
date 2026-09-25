@@ -151,6 +151,16 @@ KILL "S1:BASEXT.SYS"
 ⚠️ **Ne jamais `KILL` sans `CALL &BF000 "-U"` avant** : les crochets du BASIC et le filtre de
 `XCONSOLE` pointeraient dans de la mémoire libérée.
 
+⛔ **Ne jamais retirer un pilote installé SOUS `BASEXT.SYS` sans détacher BASEXT d'abord.** Mesuré
+le 2026-09-25 : `KILL "S1:PLINK.SYS"`, PLINK étant sous nous, fait **tomber la machine** (hard
+RESET). Notre bloc descend de la taille du disparu sans être relogé, et la tête de `d_link` comme
+les deux crochets du BASIC désignent alors du vide. La procédure sûre, et son essai, sont dans
+`essais/KILLSOUS.BAS` : `CALL bloc+32h` (`bd_arret`, crochets rendus), déliage du maillon, puis
+`SET`/`KILL` **tapés en mode direct**, puis `CALL nouveau_bloc+57h` (`bd_reprise`).
+
+⚠️ **`SET` et `KILL` sont des commandes de mode direct** : un programme qui les contient rend
+`Direct command error`.
+
 ⚠️ **Ne pas `KILL` un autre pilote installé AVANT BASEXT-DRV** (par exemple `PLINK.SYS`, placé
 sous lui dans `S1:`) tant que BASEXT-DRV est en place : le recompactage ferait descendre
 `BASEXT.SYS` sans relocation. D'abord désinstaller BASEXT-DRV, ensuite retirer l'autre pilote,

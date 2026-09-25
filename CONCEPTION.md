@@ -241,39 +241,55 @@ le lien dans `d_link`, les deux crochets du BASIC, et l'entrée du handle 0 si l
 `XCONSOLE` est branché. **À mesurer sur émulateur** : installer, `KILL` un bloc antérieur,
 relire l'adresse du bloc.
 
-#### Le protocole, et pourquoi il tient en un seul `RUN` — `essais/KILLSOUS.BAS`
+#### ⛔ MESURÉ le 2026-09-25 : le `KILL` d'un pilote placé sous le nôtre fait TOMBER la machine
 
-⛔ **On ne peut pas mesurer ceci en tapant quoi que ce soit après le `KILL`.** Si le bloc descend,
-les crochets du BASIC désignent une table déplacée, et **la tokenisation de la première ligne
-tapée ou chargée lit cette table périmée** — c'est exactement ce qui a arrêté PockEmul à la
-version 0.1 (§5bis). Charger un programme de relevé *après* le `KILL` serait donc le meilleur moyen
-de perdre la mesure.
+Relevé de J.-F. Albouy, PC-E500S réel, `PLINK.SYS` en `080018h` **sous** `BASEXT.SYS` en `080938h` :
 
-D'où `essais/KILLSOUS.BAS`, qui fait tout dans **un seul `RUN`**, sans aucun mot-clé d'extension
-(`PEEK`/`POKE` seulement, pour rester lisible même crochets perdus) :
+```
+AVANT BEXT 80938 PLINK 80018
+ NOMS +969 ADR +9D1 D_LINK  1
+Direct command error in 180
+```
 
-1. il retrouve `BASEXT  SYS` **et** `PLINK   SYS` dans la chaîne des blocs, et refuse de continuer
-   si PLINK est **au-dessus** de nous (il n'y aurait rien à mesurer) ;
-2. il relève les **décalages** des deux crochets dans le bloc (`crochet − bloc`), plutôt que de les
-   coder en dur : ils restent justes quelle que soit la version de BASEXT ;
-3. il fait lui-même `SET` puis `KILL "S1:PLINK.SYS"` ;
-4. il retrouve le bloc, dit s'il a bougé et de combien, et si les crochets ont suivi ;
-5. **s'ils ne l'ont pas suivi, il les réécrit** aux nouvelles adresses (`POKE`, avec les décalages
-   du point 2) et rechaîne au besoin notre en-tête en tête de `d_link` — la machine redevient donc
-   saine avant qu'on retape quoi que ce soit ;
-6. il affiche pour finir les crochets, `d_link`, `(txtbas)`/`(datbas)` et l'adresse de reprise
-   (`bloc + 57h`) au cas où.
+Puis `KILL "S1:PLINK.SYS"` tapé en mode direct : **l'émulateur s'arrête, hard RESET nécessaire.**
 
-⚠️ Il ne rétablit **pas** le filtre d'écran de `XCONSOLE` : faire `XCONSOLE` (sans argument) avant
-l'essai, ou accepter que le filtre soit à débrancher ensuite par `CALL` de la reprise.
+Deux choses, et la première est une faute de conception de l'essai :
 
-Trois résultats possibles, et chacun est une réponse :
+1. ⛔ **`SET` et `KILL` sont des commandes de MODE DIRECT.** Un programme qui les contient rend
+   `Direct command error` sur la ligne fautive. La première version de `KILLSOUS.BAS` voulait tout
+   faire dans un seul `RUN` — c'était impossible, et le `README` le disait déjà sans que j'y prenne
+   garde : sa procédure de désinstallation fait taper `SET`/`KILL` **à la main**.
+2. ⛔ **La limite du §4.3 est réelle, et elle est brutale.** Retirer un bloc situé sous le nôtre
+   fait descendre notre bloc de la taille du disparu (2336 octets ici), sans relocation. Trois
+   pointeurs extérieurs deviennent faux d'un coup — la tête de `d_link`, les deux crochets du
+   BASIC — et la machine tombe avant même qu'on ait pu relever quoi que ce soit. C'est la même
+   chute qu'à la version 0.1 (§5bis), par la même cause.
 
-| Relevé | Ce qu'il établit |
-|---|---|
-| `BLOC IMMOBILE` | la ROM ne recompacte pas au `KILL` : la limite du §4.3 n'existe pas, et le point 5 du plan se clôt |
-| `BLOC DESCENDU DE n` + `CROCHETS SUIVIS` | la ROM relogerait le bloc **et** ses pointeurs extérieurs — très improbable, à recouper avec `d_link` |
-| `BLOC DESCENDU DE n` + `CROCHETS PERIMES` | la limite est **réelle et mesurée** : à écrire dans le `README` comme condition d'emploi (désinstaller avant de retirer un pilote installé sous le nôtre), et la réparation est faite par le programme lui-même |
+**Condition d'emploi, à écrire partout où l'installation est décrite :** ⛔ **ne jamais retirer un
+pilote installé SOUS `BASEXT.SYS` sans détacher BASEXT d'abord.**
+
+#### La procédure sûre, et c'est le nouvel essai — `essais/KILLSOUS.BAS`
+
+Le bloc porte déjà tout ce qu'il faut, à des décalages fixes, et les deux entrées finissent par
+`retf` : elles s'appellent donc depuis le BASIC.
+
+| Décalage | Entrée | Ce qu'elle fait |
+|---|---|---|
+| `+32h` | `bd_arret` | débranche le filtre d'écran et **rend les crochets** (sentinelle `0FFFFFh`) |
+| `+57h` | `bd_reprise` | **rechaîne** notre en-tête dans `d_link` puis repose les crochets |
+| `+22h` | `iocs_header` | l'en-tête chaîné, pour le déliage |
+
+**Phase 1** (`RUN`) : `CALL bloc+32h` rend les crochets, vérifie que la sentinelle est revenue,
+puis **délie le maillon** de `d_link` par trois `POKE` (le lien vers notre en-tête reçoit notre
+suivant) — plus aucun pointeur extérieur ne désigne le bloc. Le programme affiche alors les deux
+commandes à taper.
+
+**Phase 2** (`RUN 500`, après le `SET`/`KILL`) : il retrouve le bloc à sa **nouvelle** adresse par
+la chaîne des blocs, appelle `bloc+57h`, et vérifie crochets, `d_link`, `TXT`/`DAT`.
+
+Ce que cette phase 2 mesurera, et qui reste ouvert : **de combien le bloc est descendu**, et si
+`bd_reprise` suffit à tout remettre d'aplomb. ⚠️ Le programme d'essai survit au `KILL` parce que la
+ROM recale elle-même `TEXT.BAS`/`DATA.BAS` après une suppression (§5ter, mesure du 2026-09-16).
 
 ### 4.4 ⚠️ Un BASEXT déjà installé en `0BF000h`
 
