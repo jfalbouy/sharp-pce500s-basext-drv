@@ -1,0 +1,497 @@
+000000                   	; ============================================================================
+000000                   	; T48 v2 -- LA VOIE ROM COMPLETE : 47h condense -> 48h cre_top -> 42h resize
+000000                   	; ============================================================================
+000000                   	; La v1 a mesure (2026-09-25, PC-E500S reel) que 48h REFUSE, erreur 0Ch, tant
+000000                   	; que la chaine est jointive : il exige de la place APRES la chaine, et il n'y
+000000                   	; en a jamais -- DATA.BAS la detient toute. 47h condense la rend. Cette sonde
+000000                   	; enchaine donc les trois commandes que la ROM offre, et regarde si elles font
+000000                   	; le travail que notre installateur fait a la main.
+000000                   	;
+000000                   	; ⛔ LE COMPACTAGE DEPLACE TEXT.BAS ET DATA.BAS, ET LA ROM NE RECALE RIEN.
+000000                   	;    47h (0F0A19h) appelle 42h deux fois par bloc puis SUB_F029D, qui ne met a
+000000                   	;    jour que [0BFC1Bh] ; il n'efface meme pas le bit du lecteur de
+000000                   	;    [(iocsw)+3Ah], contrairement a 48h (0F0330h). Apres un compactage nu,
+000000                   	;    (txtbas) et (datbas) designent donc l'ancienne place des blocs du BASIC.
+000000                   	;    D'ou la regle de PLINKC, reprise ici : APPELER linkbas DERRIERE CHAQUE
+000000                   	;    COMMANDE QUI DEPLACE, SUR TOUS LES CHEMINS, ERREURS COMPRISES. C'est la
+000000                   	;    raison d'etre de cette sonde : la sequence ne peut pas s'essayer depuis le
+000000                   	;    BASIC, qui reprendrait la main entre deux commandes avec des pointeurs faux.
+000000                   	;
+000000                   	; ⚠️ A APPELER EN MODE DIRECT, jamais depuis un programme : le programme vit
+000000                   	;    dans TEXT.BAS, que le compactage deplace sous ses pieds.
+000000                   	;
+000000                   	; linkbas est repris mot pour mot de BASEXTDR.ASM (bd_linkbas) : les noms des
+000000                   	; deux blocs du BASIC sont ranges en [baswrk]+72h, chacun precede de son numero
+000000                   	; de lecteur ; 41h search_phys rend l'adresse et avance X sur l'entree suivante.
+000000                   	;
+000000                   	; Zone de resultat, hors du code, dans la zone reservee :
+000000                   	;   0BFBE0h  1 octet   derniere etape atteinte : 1=47h 2=48h 3=42h(a=0)
+000000                   	;                      5=42h(a=1) 4=41h relecture, 6=fini
+000000                   	;   0BFBE1h  1 octet   code d'erreur rendu dans A
+000000                   	;   0BFBE2h  3 octets  Y rendu par 48h : l'adresse du bloc cree
+000000                   	;   0BFBE5h  3 octets  adresse du bloc apres 42h, relue par 41h
+000000                   	;   0BFBE8h  3 octets  Y rendu par 42h (taille possible, s'il refuse)
+000000                   	;   0BFBEBh  3 octets  SIGNATURE 'T42', ecrite en dernier (voir T48.ASM)
+000000                   	;
+000000                   	; Assemblage : xasm2026-4 T482.ASM -OT482.OBJ -L -S -B -K
+000000                   	; ============================================================================
+000000                   	
+000000                   	        include pce500.inc
+000000                   	txtbas: equ 0CBH ; TEXT.BAS courant
+000000                   	datbas: equ 0CEH ; DATA.BAS courant
+000000                   	cl:     equ 0D6H ; registre CL / CX bas
+000000                   	ch:     equ 0D7H ; registre CH / CX haut
+000000                   	iocsw:  equ 0E6H ; zone de travail IOCS : recopie du pointeur [0BFD17h] (3 octets) (manuel technique, IOCS Special Technique p85-86)
+000000                   	baswrk:           equ 0BFD0EH ; POINTEUR (3 octets) vers la zone de travail du BASIC, en memoire EXTERNE : il CONTIENT l'adresse, il N'EST PAS la zone. La ROM le recopie dans basptr par mvp (0D1h),[0BFD0Eh] en 0F98CAh. Nom de E. Kako (register.ls ...
+000000                   	iocs_call:        equ 0FFFE8H ; IOCS call entry
+000000                   	d6_search_phys:   equ 41H   ; memcard_search_phys - adresse physique d'un bloc d'apres son nom ((ch) = slot 0/1/2, X = nom du bloc ;
+000000                   	d6_block_resize:  equ 42H   ; memcard_block_resize - changement de taille d'un bloc ((ch) = slot, a = numero de pointeur de zone libr
+000000                   	d6_condense:      equ 47H   ; memcard_condense - compactage de l'espace libre des blocs memoire ((ch) = slot)
+000000                   	d6_blk_cre_top:   equ 48H   ; memcard_block_create_top - creation d'un bloc memoire EN TETE des blocs, propre au PC-E500 ((ch) = slot, X
+000000                   	
+000000                   	res_etape:      equ     0BFBE0H
+000000                   	res_err:        equ     0BFBE1H
+000000                   	res_adr48:      equ     0BFBE2H
+000000                   	res_adr42:      equ     0BFBE5H
+000000                   	res_y42:        equ     0BFBE8H
+000000                   	res_sig:        equ     0BFBEBH
+000000                   	
+000000                   	taille:         equ     000B17H         ; 2839 octets : la taille du bloc de BASEXT-DRV
+000000                   	
+0BF000                   	        org     0BF000H
+0BF000                   	        pre_on
+0BF000                   	
+0BF000                   	start:
+0BF000 08 00             	        mv      a,000H
+0BF002 A8 E0 FB 0B       	        mv      [res_etape],a
+0BF006 A8 E1 FB 0B       	        mv      [res_err],a
+0BF00A 0D FF FF 0F       	        mv      y,0FFFFFH
+0BF00E AD E2 FB 0B       	        mv      [res_adr48],y
+0BF012 AD E5 FB 0B       	        mv      [res_adr42],y
+0BF016 AD E8 FB 0B       	        mv      [res_y42],y
+0BF01A                   	
+0BF01A                   	; --- etape 1 : 47h condense -------------------------------------------------
+0BF01A 08 01             	        mv      a,001H
+0BF01C A8 E0 FB 0B       	        mv      [res_etape],a
+0BF020 30 CD D6 06 00    	        mvw     (cl),00006H             ; device 6, lecteur 0 (S1:)
+0BF025 09 47             	        mv      il,d6_condense
+0BF027 05 E8 FF 0F       	        callf   iocs_call
+0BF02B 1C 91             	        jrc     echec
+0BF02D 04 D9 F0          	        call    linkbas                 ; il a deplace TEXT.BAS et DATA.BAS
+0BF030                   	
+0BF030                   	; --- etape 2 : 48h block_create_top -----------------------------------------
+0BF030 08 02             	        mv      a,002H
+0BF032 A8 E0 FB 0B       	        mv      [res_etape],a
+0BF036 30 CD D6 06 00    	        mvw     (cl),00006H
+0BF03B 0C 09 F1 0B       	        mv      x,nom
+0BF03F 0D 17 0B 00       	        mv      y,taille
+0BF043 09 48             	        mv      il,d6_blk_cre_top
+0BF045 05 E8 FF 0F       	        callf   iocs_call
+0BF049 1C 73             	        jrc     echec
+0BF04B AD E2 FB 0B       	        mv      [res_adr48],y           ; adresse du bloc cree
+0BF04F 04 D9 F0          	        call    linkbas                 ; il a decale la chaine de 22h octets
+0BF052                   	
+0BF052                   	; --- etape 3 : 42h block_resize, d'abord avec a=0 ---------------------------
+0BF052                   	; Le carnet : « a = numero de pointeur de zone libre 0/1, X = nom, Y = taille
+0BF052                   	; demandee ; erreur a = 000h carte protegee, 005h bloc protege, 00Ch memoire
+0BF052                   	; insuffisante, Y = taille possible ». Lequel des deux pointeurs fait grandir
+0BF052                   	; un bloc n'est pas etabli : on essaie 0, puis 1.
+0BF052 08 03             	        mv      a,003H
+0BF054 A8 E0 FB 0B       	        mv      [res_etape],a
+0BF058 30 CD D6 06 00    	        mvw     (cl),00006H
+0BF05D 0C 09 F1 0B       	        mv      x,nom
+0BF061 0D 17 0B 00       	        mv      y,taille
+0BF065 08 00             	        mv      a,000H                  ; pointeur de zone libre 0
+0BF067 09 42             	        mv      il,d6_block_resize
+0BF069 05 E8 FF 0F       	        callf   iocs_call
+0BF06D 1E 25             	        jrnc    t42_ok
+0BF06F                   	
+0BF06F AD E8 FB 0B       	        mv      [res_y42],y             ; ce que 42h dit possible
+0BF073 A8 E1 FB 0B       	        mv      [res_err],a
+0BF077 08 05             	        mv      a,005H
+0BF079 A8 E0 FB 0B       	        mv      [res_etape],a
+0BF07D 30 CD D6 06 00    	        mvw     (cl),00006H
+0BF082 0C 09 F1 0B       	        mv      x,nom
+0BF086 0D 17 0B 00       	        mv      y,taille
+0BF08A 08 01             	        mv      a,001H                  ; pointeur de zone libre 1
+0BF08C 09 42             	        mv      il,d6_block_resize
+0BF08E 05 E8 FF 0F       	        callf   iocs_call
+0BF092 1C 2A             	        jrc     echec
+0BF094                   	
+0BF094                   	t42_ok:
+0BF094 AD E8 FB 0B       	        mv      [res_y42],y
+0BF098 04 D9 F0          	        call    linkbas                 ; il a decale les blocs suivants
+0BF09B                   	
+0BF09B                   	; --- etape 4 : relire l'adresse du bloc par 41h -----------------------------
+0BF09B 08 04             	        mv      a,004H
+0BF09D A8 E0 FB 0B       	        mv      [res_etape],a
+0BF0A1 30 CD D6 06 00    	        mvw     (cl),00006H
+0BF0A6 0C 09 F1 0B       	        mv      x,nom
+0BF0AA 09 41             	        mv      il,d6_search_phys
+0BF0AC 05 E8 FF 0F       	        callf   iocs_call
+0BF0B0 1C 0C             	        jrc     echec
+0BF0B2 AD E5 FB 0B       	        mv      [res_adr42],y
+0BF0B6                   	
+0BF0B6 08 06             	        mv      a,006H                  ; sequence complete
+0BF0B8 A8 E0 FB 0B       	        mv      [res_etape],a
+0BF0BC 12 07             	        jr      fini
+0BF0BE                   	
+0BF0BE                   	echec:
+0BF0BE A8 E1 FB 0B       	        mv      [res_err],a             ; le code AVANT tout autre usage de A
+0BF0C2 04 D9 F0          	        call    linkbas                 ; meme en erreur : PLINKC fait de meme
+0BF0C5                   	
+0BF0C5                   	fini:
+0BF0C5 0C 14 F1 0B       	        mv      x,sig
+0BF0C9 0D EB FB 0B       	        mv      y,res_sig
+0BF0CD 09 03             	        mv      il,003H
+0BF0CF 90 24             	sig_cp: mv      a,[x++]
+0BF0D1 B0 25             	        mv      [y++],a
+0BF0D3 7C 01             	        dec     il
+0BF0D5 1B 08             	        jrnz    sig_cp
+0BF0D7 9F                	        rc                              ; retour propre a BASIC
+0BF0D8 07                	        retf
+0BF0D9                   	
+0BF0D9                   	; ---------------------------------------------------------------------------
+0BF0D9                   	; linkbas -- (txtbas) et (datbas) retrouves par leur nom, puis drapeau a zero.
+0BF0D9                   	;            Repris de BASEXTDR.ASM (bd_linkbas). Appel proche.
+0BF0D9                   	; ---------------------------------------------------------------------------
+0BF0D9                   	linkbas:
+0BF0D9 8C 0E FD 0B       	        mv      x,[baswrk]
+0BF0DD 08 72             	        mv      a,072H
+0BF0DF 45 40             	        add     x,a
+0BF0E1 04 FA F0          	        call    lb_chercher
+0BF0E4 1C 13             	        jrc     lb_perdu
+0BF0E6 30 A5 CB          	        mv      (txtbas),y
+0BF0E9 04 FA F0          	        call    lb_chercher
+0BF0EC 1C 0B             	        jrc     lb_perdu
+0BF0EE 30 A5 CE          	        mv      (datbas),y
+0BF0F1 08 00             	        mv      a,000H
+0BF0F3 30 B8 80 E6 3A    	        mv      [(iocsw)+03AH],a
+0BF0F8 06                	        ret
+0BF0F9                   	lb_perdu:
+0BF0F9 FF                	        reset                           ; comme PLINKC : la memoire est incoherente
+0BF0FA                   	lb_chercher:
+0BF0FA 30 E0 24 D7       	        mv      (ch),[x++]              ; numero de lecteur, puis X sur le nom
+0BF0FE 30 CC D6 06       	        mv      (cl),006H
+0BF102 09 41             	        mv      il,041H
+0BF104 05 E8 FF 0F       	        callf   iocs_call
+0BF108 06                	        ret
+0BF109                   	
+0BF109 54 34 38 20 20 20 	nom:    db      'T48     SYS'
+0BF10F 20 20 53 59 53    	
+0BF114 54 34 32          	sig:    db      'T42'
+0BF117                   	
+0BF117                   	btm:
+0BF117                   	        assert  btm-start < 0300H       ; la sonde reste loin de res_etape
+0BF117                   	        end
+
+ - Symbols -
+
+0000EFh  amc
+0BFCBCh  apo_time
+0000D1h  basptr
+0BFD0Eh  baswrk
+0000D5h  bh
+0000D4h  bl
+0000ECh  bp_ram
+0000EAh  brkmsk
+0BF117h  btm
+0000D7h  ch
+0000D6h  cl
+0BFC29h  ctrl_disp
+00004Fh  d0_box_fill
+000042h  d0_chars_out_at
+000041h  d0_char_out_at
+000051h  d0_clear_disp
+000052h  d0_clear_from
+000049h  d0_clear_line
+000045h  d0_cursor_type
+000057h  d0_disp_no_clip
+000050h  d0_disp_state
+00004Bh  d0_dot8_read
+00004Ah  d0_dot8_write
+00004Dh  d0_dot_read
+00004Ch  d0_dot_write
+000058h  d0_guide_line
+000054h  d0_insert_line
+00004Eh  d0_line_draw
+000055h  d0_pattern_read
+000056h  d0_pattern_write
+000048h  d0_scroll_down
+000047h  d0_scroll_up
+000044h  d0_set_cursor
+000046h  d0_symbol_disp
+000045h  d1_buffer_clear
+00003Fh  d1_conv_tbl_set
+000046h  d1_fkey_display
+000040h  d1_init_driver
+000044h  d1_key_buf_set
+000043h  d1_key_read
+000041h  d1_matrix_read
+000042h  d1_mtx_rd_nd
+000042h  d2_byte_in
+000041h  d2_byte_out
+000048h  d2_er_high
+000049h  d2_er_low
+00004Bh  d2_read_cd
+00004Ah  d2_read_cs
+000046h  d2_rr_high
+000047h  d2_rr_low
+000044h  d2_rs_high
+000045h  d2_rs_low
+000043h  d2_set_hardware
+000043h  d3_printer_check
+000041h  d3_print_out
+000042h  d3_print_pos
+000042h  d4_data_read
+000043h  d4_data_verify
+000041h  d4_data_write
+000045h  d4_header_read
+000044h  d4_header_write
+000048h  d6_blk_cre_top
+000043h  d6_blk_xfer
+000045h  d6_block_create
+000046h  d6_block_delete
+000044h  d6_block_rename
+000042h  d6_block_resize
+000047h  d6_condense
+000041h  d6_search_phys
+000043h  d8_basic_exec
+000045h  d8_code_addr
+000041h  d8_power_off
+000042h  d8_secure_work
+000055h  d9_abs
+000051h  d9_acos
+000047h  d9_add
+000076h  d9_asc
+000050h  d9_asin
+000052h  d9_atan
+00007Fh  d9_bin2dec
+000077h  d9_chr_s
+00004Eh  d9_cos
+00007Eh  d9_dec2bin
+000053h  d9_deg
+00004Ah  d9_div
+000054h  d9_dms
+00004Ch  d9_exp
+000056h  d9_int
+00005Bh  d9_ln
+00005Ah  d9_log
+000049h  d9_mul
+000044h  d9_num_eq
+000046h  d9_num_ge
+000043h  d9_num_gt
+000045h  d9_num_le
+000042h  d9_num_lt
+000041h  d9_num_ne
+00004Bh  d9_pow
+000058h  d9_rnd
+000057h  d9_sgn
+00004Dh  d9_sin
+000059h  d9_sqr
+000073h  d9_str_eq
+000075h  d9_str_ge
+000072h  d9_str_gt
+000074h  d9_str_le
+000071h  d9_str_lt
+000070h  d9_str_ne
+000078h  d9_str_s
+000048h  d9_sub
+00004Fh  d9_tan
+000079h  d9_val
+0000CEh  datbas
+0BFC7Dh  defdrv
+000000h  dev_display
+000007h  dev_fdd
+000009h  dev_function
+000001h  dev_key
+000006h  dev_memcard
+000005h  dev_memfile
+000003h  dev_printer
+000002h  dev_sio
+000008h  dev_system
+000004h  dev_tape
+0000D9h  dh
+0000DDh  di
+0000D8h  dl
+0BFC96h  dotsop
+0E01C2h  drv_off
+0BFCA2h  d_link
+0BF0BEh  echec
+0000F6h  eih
+0000F5h  eil
+0000F4h  eoh
+0000F3h  eol
+0FFFE4h  fcs_call
+000002h  fcs_close_file
+000000h  fcs_create_file
+00000Eh  fcs_delete_file
+00000Ah  fcs_file_info
+00000Ch  fcs_find_file
+00000Fh  fcs_free_space
+000010h  fcs_init_fcs
+000001h  fcs_open_file
+000003h  fcs_read_block
+000005h  fcs_read_byte
+000008h  fcs_read_byte_nd
+00000Dh  fcs_rename_file
+000009h  fcs_seek
+00000Bh  fcs_set_dir
+000007h  fcs_verify_file
+000004h  fcs_write_block
+000006h  fcs_write_byte
+0BF0C5h  fini
+0BFC87h  font_00_1f
+0BFC90h  font_20_7f
+0BFC8Ah  font_80_9f
+0BFC93h  font_a0_df
+0BFC8Dh  font_e0_ff
+0BFC84h  font_pool_end
+0BFC3Fh  funckey_flag
+0BFC46h  funckey_name
+0BFC45h  funckey_slot
+0000EBh  iisr
+0000FBh  imr
+0BFCD8h  intv_ext
+0BFCC6h  intv_ftimer
+0BFCCFh  intv_onkey
+0BFCD5h  intv_sio_rx
+0BFCD2h  intv_sio_tx
+0BFCDBh  intv_soft
+0BFCC9h  intv_stimer
+0000E6h  iocsw
+0BFD17h  iocswrk
+0FFFE8h  iocs_call
+0FFFDCh  iocs_call3
+000009h  iocs_char_close
+000008h  iocs_char_open
+000022h  iocs_close_file
+000020h  iocs_create_file
+00002Eh  iocs_delete_file
+000003h  iocs_drive_name
+00002Ah  iocs_file_info
+000000h  iocs_find_drive
+00002Ch  iocs_find_file
+000004h  iocs_fmt_drive
+00003Fh  iocs_format
+00002Fh  iocs_free_space
+000001h  iocs_header_addr
+000002h  iocs_header_next
+000005h  iocs_init_all
+000040h  iocs_init_device
+000010h  iocs_media_check
+000011h  iocs_media_param
+000021h  iocs_open_file
+00000Eh  iocs_rd_byte_nd
+00000Ah  iocs_read_block
+00000Ch  iocs_read_byte
+000012h  iocs_read_sector
+00002Dh  iocs_rename_file
+000017h  iocs_sector_addr
+000029h  iocs_seek
+00002Bh  iocs_set_dir
+000016h  iocs_status_read
+000027h  iocs_verify_file
+000015h  iocs_vfy_sect
+00000Bh  iocs_write_block
+00000Dh  iocs_write_byte
+000013h  iocs_wr_sect
+000014h  iocs_wr_vfy_sect
+0000FCh  isr
+0BFCC0h  keymtx_tbl
+0BFCBFh  keyrep
+0BFC2Dh  keytbl_1b
+0BFC39h  keytbl_1b_ctrl
+0BFC33h  keytbl_1b_shift
+0BFC30h  keytbl_2b
+0BFC3Ch  keytbl_2b_ctrl
+0BFC36h  keytbl_2b_shift
+0BFCCCh  keyvct
+0BFC41h  key_hook1
+0BFCC3h  key_hook2
+0000F2h  ki
+0000F0h  ko
+0000F1h  koh
+0BF0FAh  lb_chercher
+0BF0F9h  lb_perdu
+0000FEh  lcc
+00A004h  lcd1_cmd
+002004h  lcd1_cmd_2000
+00A006h  lcd1_data
+002006h  lcd1_data_2000
+00A007h  lcd1_read
+002007h  lcd1_read_2000
+00A005h  lcd1_stat
+002005h  lcd1_stat_2000
+00A008h  lcd2_cmd
+002008h  lcd2_cmd_2000
+00A00Ah  lcd2_data
+00200Ah  lcd2_data_2000
+00A00Bh  lcd2_read
+00200Bh  lcd2_read_2000
+00A009h  lcd2_stat
+002009h  lcd2_stat_2000
+00A000h  lcd_cmd
+002000h  lcd_cmd_2000
+0BFC9Bh  lcd_crsr_x
+0BFC9Ch  lcd_crsr_y
+00A002h  lcd_data
+002002h  lcd_data_2000
+0BFC9Eh  lcd_height
+0BFCA1h  lcd_mode
+0BFC9Dh  lcd_width
+0BF0D9h  linkbas
+0BFC2Ah  linprn
+0BF109h  nom
+0000EDh  px
+0000EEh  py
+0BFCBBh  repeat_pitch
+0BFCBAh  repeat_wait
+0BFBE5h  res_adr42
+0BFBE2h  res_adr48
+0BFBE1h  res_err
+0BFBE0h  res_etape
+0BFBEBh  res_sig
+0BFBE8h  res_y42
+0000F9h  rxd
+0BFCDEh  s1_btm
+0BFC18h  s1_cap
+0BFC15h  s1_top
+0BFC12h  s2_cap
+0BFC0Fh  s2_top
+0BFC0Ch  s3_cap
+0BFC09h  s3_top
+0000FDh  scr
+0BFC27h  scrn_crsr_x
+0BFC28h  scrn_crsr_y
+0FFFD8h  secure_work_call
+0000DAh  si
+0BF114h  sig
+0BF0CFh  sig_cp
+0BFD33h  sio_baud
+0BFD62h  sio_close_data
+0BFD3Bh  sio_crlf
+0BFD3Ch  sio_eof
+0BFD41h  sio_open_ctrl
+0BFD61h  sio_open_data
+0BFD40h  sio_open_wait
+0BFD35h  sio_rx_port_cond
+0BFD36h  sio_rx_port_ctrl
+0BFD34h  sio_setup
+0BFD31h  sio_timer
+0BFD39h  sio_tx_delay
+0BFD37h  sio_tx_port_cond
+0BFD38h  sio_tx_port_ctrl
+0BFCBEh  softint
+0000FFh  ssr
+0BF000h  start
+0BFCE1h  swork
+0BF094h  t42_ok
+000B17h  taille
+0000FAh  txd
+0000CBh  txtbas
+0000F7h  ucr
+0000F8h  usr
+0BFD1Ah  usrwrk
+
+  No fatal error.  Code: 0BF000h - 0BF116h [      279 byte(s)]

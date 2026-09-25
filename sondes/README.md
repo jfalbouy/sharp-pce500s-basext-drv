@@ -120,17 +120,64 @@ voisine `45h`, il documente « erreur a = `009h` nom déjà pris, **`00Ch` mémo
 pose de l'attribut `25h`. Elle remplacerait notre montée des blocs à la main, pas le reste. Tant
 qu'elle n'est pas mesurée, **l'installateur ne bouge pas**.
 
-### T48 v2 — ce qu'il reste à mesurer
+---
+
+## T482 — la voie ROM complète : `47h` → `48h` → `42h`
 
 ⛔ **Une v2 ne peut pas se contenter d'ajouter `47h`.** Le compactage déplace `TEXT.BAS` et
-`DATA.BAS` : une sonde qui compacte **doit** recaler `(txtbas)`/`(datbas)` derrière elle, comme le
-fait `bd_linkbas` sur **tous** les chemins, sans quoi le programme BASIC qui l'a appelée perd ses
-propres blocs. C'est la raison d'être de la v2, et sa principale difficulté.
+`DATA.BAS`, et **la ROM ne recale rien** : `0F0A19h` appelle `42h` deux fois par bloc puis
+`SUB_F029D`, qui ne met à jour que `[0BFC1Bh]` — il n'efface même pas le bit du lecteur de
+`[(iocsw)+3Ah]`, contrairement à `48h`. Après un compactage nu, `(txtbas)` et `(datbas)` désignent
+l'ancienne place des blocs du BASIC. D'où la règle de PLINKC, reprise ici : **`linkbas` derrière
+chaque commande qui déplace, sur tous les chemins, erreurs comprises**. C'est pour cela que la
+séquence ne peut pas s'essayer depuis le BASIC, qui reprendrait la main entre deux commandes avec
+des pointeurs faux.
 
-Elle mesurerait, dans l'ordre : `47h`, puis `48h` (adresse rendue, position dans la chaîne), puis
-`42h` à 2839 octets (taille obtenue, déplacement des blocs suivants), puis l'état de `TXT`/`DAT` et
-du drapeau `[(iocsw)+3Ah]` — la question restée ouverte : la ROM recale-t-elle le BASIC, ou compte-
-t-elle sur le drapeau pour le faire retrouver plus tard ?
+`T482.ASM` (279 octets) enchaîne donc, dans un seul `CALL` :
+
+| Étape | Commande | Ce qu'on en retient |
+|---|---|---|
+| 1 | `47h` `condense` | rend la place à la fin de la chaîne — puis `linkbas` |
+| 2 | `48h` `block_create_top`, nom `T48     SYS`, `Y` = 2839 | `Y` rendu = adresse du bloc créé — puis `linkbas` |
+| 3 | `42h` `block_resize`, `a` = 0 **puis** `a` = 1 si refus | lequel des deux « pointeurs de zone libre » fait grandir un bloc n'est pas établi : la sonde essaie les deux et dit lequel a marché — puis `linkbas` |
+| 4 | `41h` `search_phys` | relit l'adresse du bloc, pour voir s'il a bougé entre-temps |
+
+`linkbas` est repris **mot pour mot** de `bd_linkbas` (`src/BASEXTDR.ASM`) : les noms des deux
+blocs du BASIC sont rangés en `[baswrk]+72h`, chacun précédé de son numéro de lecteur, et `41h`
+rend l'adresse tout en avançant `X` sur l'entrée suivante. Comme PLINKC, il finit par `reset` si
+les blocs du BASIC sont introuvables — la mémoire serait alors incohérente.
+
+Zone de résultat en `0BFBE0h` (étape atteinte, code d'erreur, adresse rendue par `48h`, adresse
+relue par `41h`, `Y` rendu par `42h`) et **signature `T42`** en `0BFBEBh`, que `T482.BAS` efface
+après lecture.
+
+### Protocole
+
+⚠️ **Sur un `S1:` dont on peut se passer**, et de préférence **sans pilote installé** : la
+séquence compacte, crée un bloc de 2839 octets et déplace tout le reste.
+
+1. `POKE &BFE03,&1A,&FD,&B,0,&C,0 : CALL &FFFD8` — réserver 3072 octets ;
+2. `LOAD M "X:T482.OBJ"`, puis charger `T482.BAS` ;
+3. **`RUN`** : relevé **avant** (chaîne, `TXT`/`DAT`, `+3A`) ;
+4. ⚠️ **en mode direct**, `CALL &BF000` — jamais depuis le programme, qui vit dans `TEXT.BAS` et
+   que le compactage déplace sous ses pieds ;
+5. **`RUN`** : relevé **après**, plus l'étape atteinte et les adresses ;
+6. nettoyer : `SET "S1:T48.SYS"," "` puis `KILL "S1:T48.SYS"` — **tapés en mode direct**, ce sont
+   des commandes que le BASIC refuse dans un programme (mesuré le 2026-09-25).
+
+### Ce que chaque issue apprendrait
+
+| Étape atteinte | Lecture |
+|---|---|
+| **6**, bloc en tête et `TXT`/`DAT` justes | la voie ROM fait le travail : `47h` → `48h` → `42h` remplacerait la montée des blocs **et** l'insertion de l'installateur, qui n'aurait plus qu'à copier son image et poser l'attribut `25h` |
+| **6**, mais bloc **ailleurs** qu'en tête | `48h` ne place pas là où son nom le dit : le gain se réduit à éviter le décalage manuel |
+| 3 ou 5 avec un refus `0Ch`, `Y` = taille possible | `42h` ne sait pas agrandir autant d'un coup : la taille est plafonnée par la zone libre du bloc, à lire dans `Y` |
+| **2** (`48h` refuse après `47h`) | le compactage ne rend pas la place là où `48h` la cherche — la voie ROM serait alors sans issue, et notre insertion manuelle définitivement justifiée |
+| **1** (`47h` refuse) | à lire dans le code d'erreur ; `47h` est pourtant la première chose que fait notre installateur, qui n'a jamais échoué |
+
+⚠️ **`TXT`/`DAT` justes après coup ne prouvent pas que la ROM les recale** : c'est `linkbas`, dans
+la sonde, qui les repose. Ce que la mesure dira, c'est si la séquence **peut** se faire avec un
+`linkbas` derrière — pas si elle s'en passerait.
 
 ### ⛔ Ce que la première version de la sonde a raté
 
