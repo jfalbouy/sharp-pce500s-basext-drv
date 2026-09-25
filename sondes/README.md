@@ -179,23 +179,74 @@ séquence compacte, crée un bloc de 2839 octets et déplace tout le reste.
 la sonde, qui les repose. Ce que la mesure dira, c'est si la séquence **peut** se faire avec un
 `linkbas` derrière — pas si elle s'en passerait.
 
-### ⛔ Ce que la première version de la sonde a raté
+### ✅ Résultat — PC-E500S réel, J.-F. Albouy, 2026-09-25
 
-`T48.BAS` tenait « zone de résultat à zéro » pour « sonde pas encore appelée ». La zone langage
-machine n'est pas remise à zéro : le relevé **avant** appel a donc affiché `BLOC CREE EN 9F9F00`,
-de la mémoire quelconque lue comme un résultat. La sonde écrit désormais une **signature `T48`**
-en `0BFBF5h`, que le BASIC efface après l'avoir lue : ce qui s'affiche vient du dernier appel, et
-de lui seul.
+**La séquence entière passe.** Les quatorze octets de la zone de résultat, relus en mode direct :
 
-Quoi qu'il arrive, le résultat va dans
-`Referentiel PC-E500S SC62015/03-memoire-et-systeme-pc-e500s.md` §7bis, qui porte aujourd'hui la
-question, et dans `CONCEPTION.md` §4.1 s'il change l'installateur.
+```
+6 0 18 0 8 18 0 8 17 B 0 0 0 0
+```
+
+| Octet | Valeur | Sens |
+|---|---|---|
+| étape | **6** | la séquence est allée **jusqu'au bout** |
+| erreur | **0** | aucune commande n'a refusé |
+| `48h` | **`080018h`** | le bloc a été créé **en tête de chaîne**, à l'ancienne adresse de `DATA.BAS` |
+| `41h` | **`080018h`** | après le redimensionnement, le bloc est **toujours là** : il n'a pas été déplacé |
+| `42h` | **`000B17h` = 2839** | la taille demandée, accordée d'un coup |
+
+Et la chaîne, relevée par `T482.BAS` :
+
+| Avant | Après |
+|---|---|
+| `80018` DATA 251962 · `BD852` TEXT 1696 · `BDEF2` FUNCKEY · `BDF5A` AER | **`80018` T48 SYS `20` 2873** · `80B51` DATA 420 · `80CF5` TEXT 1696 · `81395` FUNCKEY · … · `BDF5A` AER · `BDFC0` ENG $$$ |
+
+**Ce que cela établit :**
+
+1. ✅ **`48h` crée bien EN TÊTE**, et les blocs suivants montent — c'est la ROM qui fait le
+   décalage que notre installateur fait à la main.
+2. ✅ **`42h` agrandit le bloc sur place**, sans le déplacer, et accorde 2839 octets d'un coup ;
+   le bloc final fait **2873 = 2839 + 22h**, en-tête compris.
+3. ✅ **Le premier « pointeur de zone libre » (`a` = 0) suffit** : `res_err` vaut 0, or la sonde y
+   écrit le code du refus de `a` = 0 avant d'essayer `a` = 1. ⚠️ Réserve : le code `000h` existe
+   (« carte protégée »), donc la preuve n'est pas absolue.
+4. ✅ **L'attribut du bloc créé est `20h`**, celui du gabarit de la ROM (`DB_F041C`) : un pilote
+   devra poser son `25h` lui-même.
+5. ✅ **`47h` rend vraiment la place** : `DATA.BAS` retombe de 251 962 à 420 octets, sa taille réelle.
+
+⚠️ **Ce que la mesure NE tranche pas** : lequel, de `48h` ou de `42h`, a donné sa taille au bloc.
+Mon relevé de la ROM disait `48h` crée un bloc vide de `22h` octets (`Y` écrasé par `SUB_F0244`),
+et le carnet dit « `Y` = taille ». Ici les deux commandes se sont enchaînées, donc les deux lectures
+restent debout. **Une sonde `47h` + `48h` seuls, qui lirait la taille du bloc créé, trancherait en
+une minute.**
+
+### ⚠️ Deux anomalies, non expliquées
+
+1. **`(txtbas)` est resté périmé.** Après la séquence : `TXT BD852` alors que `TEXT.BAS` est en
+   `80CF5` — tandis que `DAT 80B51` est juste. `linkbas` écrit pourtant les deux à la suite, et il
+   a forcément tourné (l'étape 6 est après lui). Une recherche qui échouerait partirait sur
+   `lb_perdu` → `reset`, ce qui aurait empêché l'étape 6 : ce n'est donc pas cela. **À comprendre
+   avant de toucher à l'installateur**, puisque c'est exactement le geste qu'il fait.
+2. **La signature n'est jamais arrivée** en `0BFBEBh` (relue à zéro), alors que les cinq valeurs
+   qui la précèdent y sont. `T482.BAS` a donc répondu « SONDE PAS ENCORE APPELEE » après un appel
+   réussi. Défaut du banc d'essai, pas de la machine — et la parade est plus simple que la
+   signature : **l'octet d'étape suffit** (`0` = pas appelée, `1`-`6` = appelée), et c'est lui que
+   la prochaine version lira, en le remettant à zéro après lecture.
+
+### Ce qu'il reste à mesurer
+
+- **`47h` + `48h` seuls** : quelle taille a le bloc créé ? (tranche le point laissé ouvert) ;
+- **une trace de `(txtbas)`/`(datbas)` après chaque `linkbas`** : à quel moment `TXT` décroche ;
+- et seulement ensuite, la question qui vaut le détour : **l'installateur peut-il passer de
+  « compacter, décaler, insérer, recaler » à « `47h`, `48h`, `42h`, recaler » ?** La mesure dit que
+  la voie existe ; elle ne dit pas encore qu'elle est sûre.
 
 ### Construire
 
 ```powershell
 cd C:\Claude\BASEXT-DRV\sondes
 C:\Claude\xasm2026-4\bin\xasm2026-4.exe T48.ASM -OT48.OBJ -L -S -B -K
+C:\Claude\xasm2026-4\bin\xasm2026-4.exe T482.ASM -OT482.OBJ -L -S -B -K
 ```
 
 `pce500.inc` est une **copie** de `../src/pce500.inc`, elle-même générée : ne pas l'éditer. Le `.uu`
