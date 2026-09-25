@@ -233,13 +233,56 @@ une minute.**
    signature : **l'octet d'étape suffit** (`0` = pas appelée, `1`-`6` = appelée), et c'est lui que
    la prochaine version lira, en le remettant à zéro après lecture.
 
-### Ce qu'il reste à mesurer
+---
 
-- **`47h` + `48h` seuls** : quelle taille a le bloc créé ? (tranche le point laissé ouvert) ;
-- **une trace de `(txtbas)`/`(datbas)` après chaque `linkbas`** : à quel moment `TXT` décroche ;
-- et seulement ensuite, la question qui vaut le détour : **l'installateur peut-il passer de
-  « compacter, décaler, insérer, recaler » à « `47h`, `48h`, `42h`, recaler » ?** La mesure dit que
-  la voie existe ; elle ne dit pas encore qu'elle est sûre.
+## T483 — `47h` puis `48h` SEULS : quelle taille a le bloc ?
+
+C'est la sonde d'une minute qui tranche le point laissé ouvert par T482. Elle s'arrête après `48h`
+et **lit la taille dans l'en-tête du bloc** (champ `+11h`, celui que lit `BLOCS.BAS`) :
+
+| Taille lue | Conclusion |
+|---|---|
+| **`22h` = 34** | `48h` crée un bloc **vide** : c'est la lecture de la ROM qui a raison, et le carnet est à corriger (`Y` y est donné comme la taille) |
+| **`0B39h` = 2873** | `48h` prend bien `Y` : c'est **ma lecture de la ROM** qui est fausse, et il faudra dire où |
+| autre | à écrire telle quelle, et à comprendre |
+
+Même protocole que T482 (réserver, `LOAD M "X:T483.OBJ"`, `RUN`, `CALL &BF000` **en mode direct**,
+`RUN`), même nettoyage `SET`/`KILL` **tapé**. La sonde compacte, donc elle appelle `linkbas`
+derrière chaque commande qui déplace, erreurs comprises.
+
+## T484 — la trace de `linkbas` : où `(txtbas)` décroche-t-il ?
+
+T482 a laissé une anomalie que rien n'explique : `(datbas)` juste, `(txtbas)` périmé. C'est le
+geste même dont dépend un installateur — tant qu'on ne sait pas pourquoi, on ne touche pas au sien.
+
+Cette sonde **refait la séquence de T482 en écrivant ce qu'elle voit**. Son `linkbas` est celui du
+pilote, augmenté de la trace **et de rien d'autre** : mêmes instructions, mêmes registres, mêmes
+chemins d'erreur, sans quoi la mesure ne vaudrait pas pour lui.
+
+Seize valeurs de 3 octets en `0BFB80h`, dans l'ordre :
+
+| # | Contenu |
+|---|---|
+| 1-2 | `(txtbas)`, `(datbas)` **à l'entrée**, avant toute commande |
+| 3-6 | `linkbas` n° 1 (après `47h`) : ce que rend la **1ʳᵉ** recherche `41h`, ce que rend la **2ᵉ**, puis `(txtbas)` et `(datbas)` une fois écrits |
+| 7-10 | `linkbas` n° 2 (après `48h`), mêmes quatre valeurs |
+| 11-14 | `linkbas` n° 3 (après `42h`), mêmes quatre valeurs |
+| 15-16 | `(txtbas)`, `(datbas)` **à la sortie** |
+
+Elles distinguent les trois causes que T482 ne savait pas départager : une **recherche** qui rend
+une adresse fausse, une **écriture** qui n'a pas lieu, ou quelque chose qui **écrase** `(txtbas)`
+après coup. `T484.BAS` les affiche étiquetées, puis rappelle l'état courant et la chaîne.
+
+⛔ **Plus de signature, dans les deux.** T482 a montré qu'elle n'arrivait pas à destination sans
+qu'on sache pourquoi, alors que les valeurs qui la précédaient y étaient. **L'octet d'étape fait le
+même travail avec une variable de moins** (`0` = sonde pas appelée), et le programme BASIC le remet
+à zéro après lecture : ce qu'il affiche vient toujours du dernier appel.
+
+### Et ensuite
+
+La question qui vaut le détour, et qu'on ne posera qu'une fois ces deux-là répondues :
+**l'installateur peut-il passer de « compacter, décaler, insérer, recaler » à « `47h`, `48h`,
+`42h`, recaler » ?** T482 dit que la voie existe ; elle ne dit pas encore qu'elle est sûre.
 
 ### Construire
 
@@ -247,6 +290,8 @@ une minute.**
 cd C:\Claude\BASEXT-DRV\sondes
 C:\Claude\xasm2026-4\bin\xasm2026-4.exe T48.ASM -OT48.OBJ -L -S -B -K
 C:\Claude\xasm2026-4\bin\xasm2026-4.exe T482.ASM -OT482.OBJ -L -S -B -K
+C:\Claude\xasm2026-4\bin\xasm2026-4.exe T483.ASM -OT483.OBJ -L -S -B -K
+C:\Claude\xasm2026-4\bin\xasm2026-4.exe T484.ASM -OT484.OBJ -L -S -B -K
 ```
 
 `pce500.inc` est une **copie** de `../src/pce500.inc`, elle-même générée : ne pas l'éditer. Le `.uu`
