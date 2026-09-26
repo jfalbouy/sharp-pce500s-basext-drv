@@ -360,6 +360,62 @@ POKE &BFBDF,&84
 RUN
 ```
 
+### ✅ Résultat — PC-E500S réel, J.-F. Albouy, 2026-09-26
+
+Relevé complet, écrit par le programme dans `F:T484RES.BAS` :
+
+```
+ETAPE 6 ERR 0
+E-TXT BDF12        E-DAT 80018          <- a l'entree
+L1-CHERCHE1 8019C  L1-CHERCHE2 80018    <- apres 47h condense
+L1-TXT 8019C       L1-DAT 80018
+L2-CHERCHE1 801BE  L2-CHERCHE2 8003A    <- apres 48h
+L2-TXT 801BE       L2-DAT 8003A
+L3-CHERCHE1 80CD5  L3-CHERCHE2 80B51    <- apres 42h
+L3-TXT 80CD5       L3-DAT 80B51
+S-TXT 80CD5        S-DAT 80B51          <- a la sortie de la sonde
+MAINTENANT-TXT BDF12   MAINTENANT-DAT 80B51
+```
+
+**Les écarts disent tout :**
+
+| Entre | Écart | Ce que cela prouve |
+|---|---|---|
+| L1 → L2 (`48h`) | **+34** sur les deux | `48h` insère **exactement son en-tête** (`22h`) en tête et pousse le reste |
+| L2 → L3 (`42h`) | **+2839** sur les deux | `42h` **agrandit bien** le bloc de la taille demandée, et décale tout ce qui suit |
+
+1. ✅ **`linkbas` est innocenté, et proprement.** Aux trois passages, les deux recherches `41h`
+   rendent l'adresse juste et les deux écritures ont lieu : `L1`, `L2`, `L3` suivent le mouvement
+   au bon moment, et à la sortie de la sonde `S-TXT`/`S-DAT` sont exacts.
+2. ⛔ **L'anomalie est APRÈS le retour du `CALL`** : `MAINTENANT-TXT` vaut `BDF12`, c'est-à-dire
+   **la valeur d'entrée**, celle d'avant le compactage — tandis que `MAINTENANT-DAT` garde la
+   nouvelle. Quelque chose, entre le `retf` de la sonde et la lecture par le programme BASIC,
+   **remet `(txtbas)` à son ancienne valeur**. Ce n'est ni notre code, ni `linkbas`.
+   📖 La ROM n'écrit `(txtbas)` qu'en trois endroits — `0F9984h`, `0F99B1h`, `0F9D28h`, tous
+   `mv (txtbas),y`. Lequel s'exécute, et d'où il tire une adresse périmée, reste à lire.
+3. ⚠️ **Conséquence pour l'installateur, à établir avant d'y toucher** : l'écriture de `(txtbas)`
+   par `bd_linkbas` peut donc être **défaite** au retour du `CALL`. Or `PLINKC` et `BASEXT-DRV`
+   fonctionnent sur matériel réel depuis longtemps — la ROM retrouve donc `TEXT.BAS` autrement
+   quand elle en a besoin. Tant qu'on ne sait pas comment, on ne change rien.
+
+### ⛔ Et une erreur de lecture, la mienne
+
+J'ai écrit que `42h` n'avait « rien fait », parce que `FILES` affichait `T48 .SYS 0` alors que T482
+avait donné 2873. **Les deux relevés sont justes et disent deux choses différentes** :
+
+| Ce qu'on lit | Où | Valeur ici |
+|---|---|---|
+| taille du **bloc** | champ `+11h` de l'en-tête, ce que liste `BLOCS.BAS` | **2873** = 34 + 2839 |
+| taille du **fichier** | ce qu'affiche `FILES` (`[+16h]` − `22h`) | **0** |
+
+`48h` crée un bloc **et** un fichier vides ; `42h` ajoute de la **zone libre au bloc** — c'est le
+sens de son paramètre « numéro de pointeur de zone libre » — sans rien écrire dans le fichier.
+D'où un bloc de 2873 octets contenant un fichier de 0. C'est exactement la situation de
+`DATA.BAS`, que le référentiel avait déjà relevée (`03` §7bis) et que je n'ai pas su appliquer.
+
+**Pour un pilote, c'est le bloc qui compte** : la place est là. Reste à savoir qui doit renseigner
+`+16h` — l'installateur lui-même, vraisemblablement, comme il pose déjà l'attribut `25h`.
+
 ### Et ensuite
 
 La question qui vaut le détour, et qu'on ne posera qu'une fois ces deux-là répondues :
