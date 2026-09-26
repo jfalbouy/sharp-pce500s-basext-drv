@@ -453,6 +453,51 @@ immédiatement** la valeur d'origine dans la même séquence d'instructions.
 ⚠️ La valeur d'essai n'existe que le temps d'une ligne, et c'est une adresse de bloc valide : si
 quelque chose la déréférence entre le `POKE` et la restauration, il lit un en-tête réel.
 
+### ✅ Résultat — et il fait tomber toute l'affaire (2026-09-26)
+
+```
+TXT BE0C0 DAT 80018
+APRES LE CALL : 80018
+-> LE CALL NE RESTAURE PAS
+```
+
+La valeur écrite a survécu au `CALL`. **Il n'y a donc pas de sauve/restaure** — et comme les
+quatre écritures de la ROM sont des recherches vivantes, il ne reste plus une seule façon de
+produire une valeur périmée. Ce qui veut dire qu'il n'y en avait pas.
+
+**Ce qui s'est réellement passé, et l'arithmétique le dit à l'octet près :**
+
+| Moment | `TXT` | `DAT` |
+|---|---|---|
+| entrée du `CALL` | `BDF12` | `80018` |
+| sortie de la sonde | `80CD5` | `80B51` |
+| lu par le programme, après `RUN` | **`BDF12`** | `80B51` |
+
+`DATA.BAS` commence en `80B51` et **grandit vers le haut** : tout ce qui est au-dessus d'elle est
+poussé. Quand le BASIC reprend la main, elle réabsorbe la place libre — et comme notre bloc lui a
+pris ses 2839 octets **par en dessous**, `TEXT.BAS` remonte exactement là où il était :
+
+```
+80B51 + (BDF12 - 80018) - 2873 = BDF12
+```
+
+**`(txtbas)` n'était pas périmé : il suivait `TEXT.BAS`, qui était revenu à son ancienne adresse.**
+
+### ⛔ Trois sondes pour une anomalie qui n'existait pas
+
+Ce que j'ai appelé « l'anomalie » n'était qu'une **comparaison de valeurs prises à des instants
+différents**. Dans T482, le programme listait la chaîne, puis lisait `(txtbas)` quelques lignes
+plus loin : entre les deux, ses propres variables avaient fait grandir `DATA.BAS`, donc bouger
+`TEXT.BAS`, et les deux relevés ne parlaient plus du même état.
+
+**La leçon, et elle vaut plus que la mesure** : sur cette machine, **le simple fait d'exécuter un
+programme déplace les blocs**. Deux valeurs lues à deux lignes d'intervalle ne sont pas
+comparables ; il faut les prendre **dans la même respiration**, ou les rapporter au même instant.
+C'est exactement ce que fait la trace de T484 — et c'est elle qui a fini par donner la réponse.
+
+✅ **Conséquence pratique, rassurante** : `bd_linkbas` fait son travail, l'installateur n'a aucun
+défaut de ce côté, et il n'y a rien à corriger.
+
 ### Et ensuite
 
 La question qui vaut le détour, et qu'on ne posera qu'une fois ces deux-là répondues :
