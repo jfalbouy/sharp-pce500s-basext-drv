@@ -22,8 +22,16 @@
 000000                   	;
 000000                   	; ⚠️ Appel EN MODE DIRECT, comme T482 : le compactage deplace TEXT.BAS.
 000000                   	;
+000000                   	; ⛔ UN MARQUEUR DOIT DIRE QUI L'A ECRIT, PAS SEULEMENT QU'ON A ECRIT. Releve du
+000000                   	;    2026-09-26 : T484.BAS lance AVANT le LOADM a affiche « ETAPE 5 ERR 0 » et
+000000                   	;    des adresses de fantaisie -- c'etait l'etape 5 laissee par T483, qui partage
+000000                   	;    la meme zone de resultat et n'avait pas pu l'effacer (il etait mort sur
+000000                   	;    « Out of memory »). D'ou res_id : chaque sonde signe ses octets, et le
+000000                   	;    programme BASIC refuse ceux d'une autre.
+000000                   	;
 000000                   	; Zone de resultat :
-000000                   	;   0BFBE0h  1 octet   etape (0 = sonde pas appelee) : 1=47h 2=48h 3=42h(a=0)
+000000                   	;   0BFBDFh  1 octet   IDENTIFIANT 084H, ecrit en PREMIER : « ces octets sont de T484 »
+000000                   	;   0BFBE0h  1 octet   etape : 1=47h 2=48h 3=42h(a=0)
 000000                   	;                      5=42h(a=1) 4=41h 6=fini
 000000                   	;   0BFBE1h  1 octet   code d'erreur rendu dans A
 000000                   	;   0BFB7Dh  3 octets  pointeur d'ecriture de la trace (interne a la sonde)
@@ -40,11 +48,12 @@
 000000                   	iocsw:  equ 0E6H ; zone de travail IOCS : recopie du pointeur [0BFD17h] (3 octets) (manuel technique, IOCS Special Technique p85-86)
 000000                   	baswrk:           equ 0BFD0EH ; POINTEUR (3 octets) vers la zone de travail du BASIC, en memoire EXTERNE : il CONTIENT l'adresse, il N'EST PAS la zone. La ROM le recopie dans basptr par mvp (0D1h),[0BFD0Eh] en 0F98CAh. Nom de E. Kako (register.ls ...
 000000                   	iocs_call:        equ 0FFFE8H ; IOCS call entry
-000000                   	d6_search_phys:   equ 41H   ; memcard_search_phys - adresse physique d'un bloc d'apres son nom ((ch) = slot 0/1/2, X = nom du bloc ;
-000000                   	d6_block_resize:  equ 42H   ; memcard_block_resize - changement de taille d'un bloc ((ch) = slot, a = numero de pointeur de zone libr
+000000                   	d6_search_phys:   equ 41H   ; memcard_search_phys - adresse physique d'un bloc d'apres son nom ((ch) = slot 0/1/2, X = nom du bloc ...
+000000                   	d6_block_resize:  equ 42H   ; memcard_block_resize - changement de taille d'un bloc ((ch) = slot, a = numero de pointeur de zone ...
 000000                   	d6_condense:      equ 47H   ; memcard_condense - compactage de l'espace libre des blocs memoire ((ch) = slot)
-000000                   	d6_blk_cre_top:   equ 48H   ; memcard_block_create_top - creation d'un bloc memoire EN TETE des blocs, propre au PC-E500 ((ch) = slot, X
+000000                   	d6_blk_cre_top:   equ 48H   ; memcard_block_create_top - cree un bloc VIDE de 22h octets EN TETE ; la taille passee dans Y est IGNOREE ...
 000000                   	
+000000                   	res_id:         equ     0BFBDFH         ; 084H = « c'est T484 qui a ecrit »
 000000                   	res_etape:      equ     0BFBE0H
 000000                   	res_err:        equ     0BFBE1H
 000000                   	tr_ptr:         equ     0BFB7DH
@@ -56,139 +65,141 @@
 0BF000                   	        pre_on
 0BF000                   	
 0BF000                   	start:
-0BF000 08 00             	        mv      a,000H
-0BF002 A8 E0 FB 0B       	        mv      [res_etape],a
-0BF006 A8 E1 FB 0B       	        mv      [res_err],a
-0BF00A 0D 80 FB 0B       	        mv      y,tr_base               ; la trace repart du debut a chaque appel
-0BF00E AD 7D FB 0B       	        mv      [tr_ptr],y
-0BF012 04 01 F1          	        call    tr_pair                 ; (1)(2) l'etat d'entree
-0BF015                   	
-0BF015                   	; --- etape 1 : 47h condense -------------------------------------------------
-0BF015 08 01             	        mv      a,001H
-0BF017 A8 E0 FB 0B       	        mv      [res_etape],a
-0BF01B 30 CD D6 06 00    	        mvw     (cl),00006H
-0BF020 09 47             	        mv      il,d6_condense
-0BF022 05 E8 FF 0F       	        callf   iocs_call
-0BF026 1C 81             	        jrc     echec
-0BF028 04 B5 F0          	        call    linkbas                 ; (3)(4)(5)(6)
-0BF02B                   	
-0BF02B                   	; --- etape 2 : 48h block_create_top -----------------------------------------
-0BF02B 08 02             	        mv      a,002H
-0BF02D A8 E0 FB 0B       	        mv      [res_etape],a
-0BF031 30 CD D6 06 00    	        mvw     (cl),00006H
-0BF036 0C 0E F1 0B       	        mv      x,nom
-0BF03A 0D 17 0B 00       	        mv      y,demande
-0BF03E 09 48             	        mv      il,d6_blk_cre_top
-0BF040 05 E8 FF 0F       	        callf   iocs_call
-0BF044 1C 63             	        jrc     echec
-0BF046 04 B5 F0          	        call    linkbas                 ; (7)(8)(9)(10)
-0BF049                   	
-0BF049                   	; --- etape 3 : 42h block_resize, a=0 puis a=1 -------------------------------
-0BF049 08 03             	        mv      a,003H
-0BF04B A8 E0 FB 0B       	        mv      [res_etape],a
-0BF04F 30 CD D6 06 00    	        mvw     (cl),00006H
-0BF054 0C 0E F1 0B       	        mv      x,nom
-0BF058 0D 17 0B 00       	        mv      y,demande
-0BF05C 08 00             	        mv      a,000H
-0BF05E 09 42             	        mv      il,d6_block_resize
-0BF060 05 E8 FF 0F       	        callf   iocs_call
-0BF064 1E 21             	        jrnc    t42_ok
-0BF066                   	
-0BF066 A8 E1 FB 0B       	        mv      [res_err],a
-0BF06A 08 05             	        mv      a,005H
-0BF06C A8 E0 FB 0B       	        mv      [res_etape],a
-0BF070 30 CD D6 06 00    	        mvw     (cl),00006H
-0BF075 0C 0E F1 0B       	        mv      x,nom
-0BF079 0D 17 0B 00       	        mv      y,demande
-0BF07D 08 01             	        mv      a,001H
-0BF07F 09 42             	        mv      il,d6_block_resize
-0BF081 05 E8 FF 0F       	        callf   iocs_call
-0BF085 1C 22             	        jrc     echec
-0BF087                   	
-0BF087                   	t42_ok:
-0BF087 04 B5 F0          	        call    linkbas                 ; (11)(12)(13)(14)
-0BF08A                   	
-0BF08A                   	; --- etape 4 : relecture 41h, pour memoire ----------------------------------
-0BF08A 08 04             	        mv      a,004H
-0BF08C A8 E0 FB 0B       	        mv      [res_etape],a
-0BF090 30 CD D6 06 00    	        mvw     (cl),00006H
-0BF095 0C 0E F1 0B       	        mv      x,nom
-0BF099 09 41             	        mv      il,d6_search_phys
-0BF09B 05 E8 FF 0F       	        callf   iocs_call
-0BF09F 1C 08             	        jrc     echec
-0BF0A1                   	
-0BF0A1 08 06             	        mv      a,006H
-0BF0A3 A8 E0 FB 0B       	        mv      [res_etape],a
-0BF0A7 12 07             	        jr      fini
-0BF0A9                   	
-0BF0A9                   	echec:
-0BF0A9 A8 E1 FB 0B       	        mv      [res_err],a
-0BF0AD 04 B5 F0          	        call    linkbas
-0BF0B0                   	
-0BF0B0                   	fini:
-0BF0B0 04 01 F1          	        call    tr_pair                 ; (15)(16) l'etat de sortie
-0BF0B3 9F                	        rc
-0BF0B4 07                	        retf
-0BF0B5                   	
-0BF0B5                   	; ---------------------------------------------------------------------------
-0BF0B5                   	; linkbas -- celui de BASEXTDR.ASM, AUGMENTE DE LA TRACE et de rien d'autre :
-0BF0B5                   	;            l'ordre des instructions, les registres et les chemins d'erreur
-0BF0B5                   	;            sont ceux du pilote, sans quoi la mesure ne vaudrait pas pour lui.
-0BF0B5                   	; ---------------------------------------------------------------------------
-0BF0B5                   	linkbas:
-0BF0B5 8C 0E FD 0B       	        mv      x,[baswrk]
-0BF0B9 08 72             	        mv      a,072H
-0BF0BB 45 40             	        add     x,a
-0BF0BD 04 E3 F0          	        call    lb_chercher
-0BF0C0 1C 20             	        jrc     lb_perdu
-0BF0C2 2C                	        pushu   x                       ; tr_y detruit X, que l'idiome fait avancer
-0BF0C3 04 F2 F0          	        call    tr_y                    ; ce que la 1re recherche a rendu
-0BF0C6 3C                	        popu    x
-0BF0C7 30 A5 CB          	        mv      (txtbas),y
-0BF0CA 04 E3 F0          	        call    lb_chercher
-0BF0CD 1C 13             	        jrc     lb_perdu
-0BF0CF 2C                	        pushu   x
-0BF0D0 04 F2 F0          	        call    tr_y                    ; ce que la 2e recherche a rendu
-0BF0D3 3C                	        popu    x
-0BF0D4 30 A5 CE          	        mv      (datbas),y
-0BF0D7 08 00             	        mv      a,000H
-0BF0D9 30 B8 80 E6 3A    	        mv      [(iocsw)+03AH],a
-0BF0DE 04 01 F1          	        call    tr_pair                 ; (txtbas) et (datbas) tels qu'ils sont
-0BF0E1 06                	        ret
-0BF0E2                   	lb_perdu:
-0BF0E2 FF                	        reset
-0BF0E3                   	lb_chercher:
-0BF0E3 30 E0 24 D7       	        mv      (ch),[x++]
-0BF0E7 30 CC D6 06       	        mv      (cl),006H
-0BF0EB 09 41             	        mv      il,041H
-0BF0ED 05 E8 FF 0F       	        callf   iocs_call
-0BF0F1 06                	        ret
-0BF0F2                   	
-0BF0F2                   	; ---------------------------------------------------------------------------
-0BF0F2                   	; tr_y    -- ajoute Y a la trace. Detruit A et X ; PRESERVE Y.
-0BF0F2                   	; tr_pair -- ajoute (txtbas) puis (datbas). Detruit A, X et Y.
-0BF0F2                   	; ---------------------------------------------------------------------------
-0BF0F2                   	tr_y:
-0BF0F2 8C 7D FB 0B       	        mv      x,[tr_ptr]
-0BF0F6 B5 04             	        mv      [x],y
-0BF0F8 08 03             	        mv      a,003H
-0BF0FA 45 40             	        add     x,a
-0BF0FC AC 7D FB 0B       	        mv      [tr_ptr],x
-0BF100 06                	        ret
-0BF101                   	
-0BF101                   	tr_pair:
-0BF101 30 85 CB          	        mv      y,(txtbas)
-0BF104 04 F2 F0          	        call    tr_y
-0BF107 30 85 CE          	        mv      y,(datbas)
-0BF10A 04 F2 F0          	        call    tr_y
-0BF10D 06                	        ret
-0BF10E                   	
-0BF10E 54 34 38 20 20 20 	nom:    db      'T48     SYS'
-0BF114 20 20 53 59 53    	
-0BF119                   	
-0BF119                   	btm:
-0BF119                   	        assert  btm-start < 0300H
-0BF119                   	        end
+0BF000 08 84             	        mv      a,084H                  ; T484 : l'identifiant AVANT tout, il survit a un arret
+0BF002 A8 DF FB 0B       	        mv      [res_id],a
+0BF006 08 00             	        mv      a,000H
+0BF008 A8 E0 FB 0B       	        mv      [res_etape],a
+0BF00C A8 E1 FB 0B       	        mv      [res_err],a
+0BF010 0D 80 FB 0B       	        mv      y,tr_base               ; la trace repart du debut a chaque appel
+0BF014 AD 7D FB 0B       	        mv      [tr_ptr],y
+0BF018 04 07 F1          	        call    tr_pair                 ; (1)(2) l'etat d'entree
+0BF01B                   	
+0BF01B                   	; --- etape 1 : 47h condense -------------------------------------------------
+0BF01B 08 01             	        mv      a,001H
+0BF01D A8 E0 FB 0B       	        mv      [res_etape],a
+0BF021 30 CD D6 06 00    	        mvw     (cl),00006H
+0BF026 09 47             	        mv      il,d6_condense
+0BF028 05 E8 FF 0F       	        callf   iocs_call
+0BF02C 1C 81             	        jrc     echec
+0BF02E 04 BB F0          	        call    linkbas                 ; (3)(4)(5)(6)
+0BF031                   	
+0BF031                   	; --- etape 2 : 48h block_create_top -----------------------------------------
+0BF031 08 02             	        mv      a,002H
+0BF033 A8 E0 FB 0B       	        mv      [res_etape],a
+0BF037 30 CD D6 06 00    	        mvw     (cl),00006H
+0BF03C 0C 14 F1 0B       	        mv      x,nom
+0BF040 0D 17 0B 00       	        mv      y,demande
+0BF044 09 48             	        mv      il,d6_blk_cre_top
+0BF046 05 E8 FF 0F       	        callf   iocs_call
+0BF04A 1C 63             	        jrc     echec
+0BF04C 04 BB F0          	        call    linkbas                 ; (7)(8)(9)(10)
+0BF04F                   	
+0BF04F                   	; --- etape 3 : 42h block_resize, a=0 puis a=1 -------------------------------
+0BF04F 08 03             	        mv      a,003H
+0BF051 A8 E0 FB 0B       	        mv      [res_etape],a
+0BF055 30 CD D6 06 00    	        mvw     (cl),00006H
+0BF05A 0C 14 F1 0B       	        mv      x,nom
+0BF05E 0D 17 0B 00       	        mv      y,demande
+0BF062 08 00             	        mv      a,000H
+0BF064 09 42             	        mv      il,d6_block_resize
+0BF066 05 E8 FF 0F       	        callf   iocs_call
+0BF06A 1E 21             	        jrnc    t42_ok
+0BF06C                   	
+0BF06C A8 E1 FB 0B       	        mv      [res_err],a
+0BF070 08 05             	        mv      a,005H
+0BF072 A8 E0 FB 0B       	        mv      [res_etape],a
+0BF076 30 CD D6 06 00    	        mvw     (cl),00006H
+0BF07B 0C 14 F1 0B       	        mv      x,nom
+0BF07F 0D 17 0B 00       	        mv      y,demande
+0BF083 08 01             	        mv      a,001H
+0BF085 09 42             	        mv      il,d6_block_resize
+0BF087 05 E8 FF 0F       	        callf   iocs_call
+0BF08B 1C 22             	        jrc     echec
+0BF08D                   	
+0BF08D                   	t42_ok:
+0BF08D 04 BB F0          	        call    linkbas                 ; (11)(12)(13)(14)
+0BF090                   	
+0BF090                   	; --- etape 4 : relecture 41h, pour memoire ----------------------------------
+0BF090 08 04             	        mv      a,004H
+0BF092 A8 E0 FB 0B       	        mv      [res_etape],a
+0BF096 30 CD D6 06 00    	        mvw     (cl),00006H
+0BF09B 0C 14 F1 0B       	        mv      x,nom
+0BF09F 09 41             	        mv      il,d6_search_phys
+0BF0A1 05 E8 FF 0F       	        callf   iocs_call
+0BF0A5 1C 08             	        jrc     echec
+0BF0A7                   	
+0BF0A7 08 06             	        mv      a,006H
+0BF0A9 A8 E0 FB 0B       	        mv      [res_etape],a
+0BF0AD 12 07             	        jr      fini
+0BF0AF                   	
+0BF0AF                   	echec:
+0BF0AF A8 E1 FB 0B       	        mv      [res_err],a
+0BF0B3 04 BB F0          	        call    linkbas
+0BF0B6                   	
+0BF0B6                   	fini:
+0BF0B6 04 07 F1          	        call    tr_pair                 ; (15)(16) l'etat de sortie
+0BF0B9 9F                	        rc
+0BF0BA 07                	        retf
+0BF0BB                   	
+0BF0BB                   	; ---------------------------------------------------------------------------
+0BF0BB                   	; linkbas -- celui de BASEXTDR.ASM, AUGMENTE DE LA TRACE et de rien d'autre :
+0BF0BB                   	;            l'ordre des instructions, les registres et les chemins d'erreur
+0BF0BB                   	;            sont ceux du pilote, sans quoi la mesure ne vaudrait pas pour lui.
+0BF0BB                   	; ---------------------------------------------------------------------------
+0BF0BB                   	linkbas:
+0BF0BB 8C 0E FD 0B       	        mv      x,[baswrk]
+0BF0BF 08 72             	        mv      a,072H
+0BF0C1 45 40             	        add     x,a
+0BF0C3 04 E9 F0          	        call    lb_chercher
+0BF0C6 1C 20             	        jrc     lb_perdu
+0BF0C8 2C                	        pushu   x                       ; tr_y detruit X, que l'idiome fait avancer
+0BF0C9 04 F8 F0          	        call    tr_y                    ; ce que la 1re recherche a rendu
+0BF0CC 3C                	        popu    x
+0BF0CD 30 A5 CB          	        mv      (txtbas),y
+0BF0D0 04 E9 F0          	        call    lb_chercher
+0BF0D3 1C 13             	        jrc     lb_perdu
+0BF0D5 2C                	        pushu   x
+0BF0D6 04 F8 F0          	        call    tr_y                    ; ce que la 2e recherche a rendu
+0BF0D9 3C                	        popu    x
+0BF0DA 30 A5 CE          	        mv      (datbas),y
+0BF0DD 08 00             	        mv      a,000H
+0BF0DF 30 B8 80 E6 3A    	        mv      [(iocsw)+03AH],a
+0BF0E4 04 07 F1          	        call    tr_pair                 ; (txtbas) et (datbas) tels qu'ils sont
+0BF0E7 06                	        ret
+0BF0E8                   	lb_perdu:
+0BF0E8 FF                	        reset
+0BF0E9                   	lb_chercher:
+0BF0E9 30 E0 24 D7       	        mv      (ch),[x++]
+0BF0ED 30 CC D6 06       	        mv      (cl),006H
+0BF0F1 09 41             	        mv      il,041H
+0BF0F3 05 E8 FF 0F       	        callf   iocs_call
+0BF0F7 06                	        ret
+0BF0F8                   	
+0BF0F8                   	; ---------------------------------------------------------------------------
+0BF0F8                   	; tr_y    -- ajoute Y a la trace. Detruit A et X ; PRESERVE Y.
+0BF0F8                   	; tr_pair -- ajoute (txtbas) puis (datbas). Detruit A, X et Y.
+0BF0F8                   	; ---------------------------------------------------------------------------
+0BF0F8                   	tr_y:
+0BF0F8 8C 7D FB 0B       	        mv      x,[tr_ptr]
+0BF0FC B5 04             	        mv      [x],y
+0BF0FE 08 03             	        mv      a,003H
+0BF100 45 40             	        add     x,a
+0BF102 AC 7D FB 0B       	        mv      [tr_ptr],x
+0BF106 06                	        ret
+0BF107                   	
+0BF107                   	tr_pair:
+0BF107 30 85 CB          	        mv      y,(txtbas)
+0BF10A 04 F8 F0          	        call    tr_y
+0BF10D 30 85 CE          	        mv      y,(datbas)
+0BF110 04 F8 F0          	        call    tr_y
+0BF113 06                	        ret
+0BF114                   	
+0BF114 54 34 38 20 20 20 	nom:    db      'T48     SYS'
+0BF11A 20 20 53 59 53    	
+0BF11F                   	
+0BF11F                   	btm:
+0BF11F                   	        assert  btm-start < 0300H
+0BF11F                   	        end
 
  - Symbols -
 
@@ -200,7 +211,7 @@
 0000D4h  bl
 0000ECh  bp_ram
 0000EAh  brkmsk
-0BF119h  btm
+0BF11Fh  btm
 0000D7h  ch
 0000D6h  cl
 0BFC29h  ctrl_disp
@@ -323,7 +334,7 @@
 0BFC96h  dotsop
 0E01C2h  drv_off
 0BFCA2h  d_link
-0BF0A9h  echec
+0BF0AFh  echec
 0000F6h  eih
 0000F5h  eil
 0000F4h  eoh
@@ -346,7 +357,7 @@
 000007h  fcs_verify_file
 000004h  fcs_write_block
 000006h  fcs_write_byte
-0BF0B0h  fini
+0BF0B6h  fini
 0BFC87h  font_00_1f
 0BFC90h  font_20_7f
 0BFC8Ah  font_80_9f
@@ -418,8 +429,8 @@
 0000F2h  ki
 0000F0h  ko
 0000F1h  koh
-0BF0E3h  lb_chercher
-0BF0E2h  lb_perdu
+0BF0E9h  lb_chercher
+0BF0E8h  lb_perdu
 0000FEh  lcc
 00A004h  lcd1_cmd
 002004h  lcd1_cmd_2000
@@ -446,15 +457,16 @@
 0BFC9Eh  lcd_height
 0BFCA1h  lcd_mode
 0BFC9Dh  lcd_width
-0BF0B5h  linkbas
+0BF0BBh  linkbas
 0BFC2Ah  linprn
-0BF10Eh  nom
+0BF114h  nom
 0000EDh  px
 0000EEh  py
 0BFCBBh  repeat_pitch
 0BFCBAh  repeat_wait
 0BFBE1h  res_err
 0BFBE0h  res_etape
+0BFBDFh  res_id
 0000F9h  rxd
 0BFCDEh  s1_btm
 0BFC18h  s1_cap
@@ -486,15 +498,15 @@
 0000FFh  ssr
 0BF000h  start
 0BFCE1h  swork
-0BF087h  t42_ok
+0BF08Dh  t42_ok
 0BFB80h  tr_base
-0BF101h  tr_pair
+0BF107h  tr_pair
 0BFB7Dh  tr_ptr
-0BF0F2h  tr_y
+0BF0F8h  tr_y
 0000FAh  txd
 0000CBh  txtbas
 0000F7h  ucr
 0000F8h  usr
 0BFD1Ah  usrwrk
 
-  No fatal error.  Code: 0BF000h - 0BF118h [      281 byte(s)]
+  No fatal error.  Code: 0BF000h - 0BF11Eh [      287 byte(s)]

@@ -22,8 +22,16 @@
 ;
 ; ⚠️ Appel EN MODE DIRECT, comme T482 : le compactage deplace TEXT.BAS.
 ;
+; ⛔ UN MARQUEUR DOIT DIRE QUI L'A ECRIT, PAS SEULEMENT QU'ON A ECRIT. Releve du
+;    2026-09-26 : T484.BAS lance AVANT le LOADM a affiche « ETAPE 5 ERR 0 » et
+;    des adresses de fantaisie -- c'etait l'etape 5 laissee par T483, qui partage
+;    la meme zone de resultat et n'avait pas pu l'effacer (il etait mort sur
+;    « Out of memory »). D'ou res_id : chaque sonde signe ses octets, et le
+;    programme BASIC refuse ceux d'une autre.
+;
 ; Zone de resultat :
-;   0BFBE0h  1 octet   etape (0 = sonde pas appelee) : 1=47h 2=48h 3=42h(a=0)
+;   0BFBDFh  1 octet   IDENTIFIANT 084H, ecrit en PREMIER : « ces octets sont de T484 »
+;   0BFBE0h  1 octet   etape : 1=47h 2=48h 3=42h(a=0)
 ;                      5=42h(a=1) 4=41h 6=fini
 ;   0BFBE1h  1 octet   code d'erreur rendu dans A
 ;   0BFB7Dh  3 octets  pointeur d'ecriture de la trace (interne a la sonde)
@@ -34,6 +42,7 @@
 
         include pce500.inc
 
+res_id:         equ     0BFBDFH         ; 084H = « c'est T484 qui a ecrit »
 res_etape:      equ     0BFBE0H
 res_err:        equ     0BFBE1H
 tr_ptr:         equ     0BFB7DH
@@ -45,6 +54,8 @@ demande:        equ     000B17H         ; 2839 octets, comme T482
         pre_on
 
 start:
+        mv      a,084H                  ; T484 : l'identifiant AVANT tout, il survit a un arret
+        mv      [res_id],a
         mv      a,000H
         mv      [res_etape],a
         mv      [res_err],a

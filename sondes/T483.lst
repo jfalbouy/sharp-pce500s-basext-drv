@@ -46,10 +46,11 @@
 000000                   	iocsw:  equ 0E6H ; zone de travail IOCS : recopie du pointeur [0BFD17h] (3 octets) (manuel technique, IOCS Special Technique p85-86)
 000000                   	baswrk:           equ 0BFD0EH ; POINTEUR (3 octets) vers la zone de travail du BASIC, en memoire EXTERNE : il CONTIENT l'adresse, il N'EST PAS la zone. La ROM le recopie dans basptr par mvp (0D1h),[0BFD0Eh] en 0F98CAh. Nom de E. Kako (register.ls ...
 000000                   	iocs_call:        equ 0FFFE8H ; IOCS call entry
-000000                   	d6_search_phys:   equ 41H   ; memcard_search_phys - adresse physique d'un bloc d'apres son nom ((ch) = slot 0/1/2, X = nom du bloc ;
+000000                   	d6_search_phys:   equ 41H   ; memcard_search_phys - adresse physique d'un bloc d'apres son nom ((ch) = slot 0/1/2, X = nom du bloc ...
 000000                   	d6_condense:      equ 47H   ; memcard_condense - compactage de l'espace libre des blocs memoire ((ch) = slot)
-000000                   	d6_blk_cre_top:   equ 48H   ; memcard_block_create_top - creation d'un bloc memoire EN TETE des blocs, propre au PC-E500 ((ch) = slot, X
+000000                   	d6_blk_cre_top:   equ 48H   ; memcard_block_create_top - cree un bloc VIDE de 22h octets EN TETE ; la taille passee dans Y est IGNOREE ...
 000000                   	
+000000                   	res_id:         equ     0BFBDFH         ; 083H = « c'est T483 qui a ecrit »
 000000                   	res_etape:      equ     0BFBE0H
 000000                   	res_err:        equ     0BFBE1H
 000000                   	res_adr48:      equ     0BFBE2H
@@ -62,93 +63,95 @@
 0BF000                   	        pre_on
 0BF000                   	
 0BF000                   	start:
-0BF000 08 00             	        mv      a,000H
-0BF002 A8 E0 FB 0B       	        mv      [res_etape],a
-0BF006 A8 E1 FB 0B       	        mv      [res_err],a
-0BF00A 0D FF FF 0F       	        mv      y,0FFFFFH
-0BF00E AD E2 FB 0B       	        mv      [res_adr48],y
-0BF012 AD E5 FB 0B       	        mv      [res_adr41],y
-0BF016 AD E8 FB 0B       	        mv      [res_taille],y
-0BF01A                   	
-0BF01A                   	; --- etape 1 : 47h condense -------------------------------------------------
-0BF01A 08 01             	        mv      a,001H
-0BF01C A8 E0 FB 0B       	        mv      [res_etape],a
-0BF020 30 CD D6 06 00    	        mvw     (cl),00006H
-0BF025 09 47             	        mv      il,d6_condense
-0BF027 05 E8 FF 0F       	        callf   iocs_call
-0BF02B 1C 52             	        jrc     echec
-0BF02D 04 88 F0          	        call    linkbas
-0BF030                   	
-0BF030                   	; --- etape 2 : 48h block_create_top, ET RIEN D'AUTRE ------------------------
-0BF030 08 02             	        mv      a,002H
-0BF032 A8 E0 FB 0B       	        mv      [res_etape],a
-0BF036 30 CD D6 06 00    	        mvw     (cl),00006H
-0BF03B 0C B8 F0 0B       	        mv      x,nom
-0BF03F 0D 17 0B 00       	        mv      y,demande
-0BF043 09 48             	        mv      il,d6_blk_cre_top
-0BF045 05 E8 FF 0F       	        callf   iocs_call
-0BF049 1C 34             	        jrc     echec
-0BF04B AD E2 FB 0B       	        mv      [res_adr48],y
-0BF04F 04 88 F0          	        call    linkbas
-0BF052                   	
-0BF052                   	; --- etape 3 : relire l'adresse, puis la TAILLE dans l'en-tete --------------
-0BF052 08 03             	        mv      a,003H
-0BF054 A8 E0 FB 0B       	        mv      [res_etape],a
-0BF058 30 CD D6 06 00    	        mvw     (cl),00006H
-0BF05D 0C B8 F0 0B       	        mv      x,nom
-0BF061 09 41             	        mv      il,d6_search_phys
-0BF063 05 E8 FF 0F       	        callf   iocs_call
-0BF067 1C 16             	        jrc     echec
-0BF069 AD E5 FB 0B       	        mv      [res_adr41],y
-0BF06D                   	
-0BF06D 08 11             	        mv      a,011H                  ; champ « taille du bloc » de l'en-tete
-0BF06F 45 50             	        add     y,a
-0BF071 95 05             	        mv      y,[y]                   ; les 3 octets de la taille
-0BF073 AD E8 FB 0B       	        mv      [res_taille],y
-0BF077                   	
-0BF077 08 05             	        mv      a,005H                  ; sequence complete
-0BF079 A8 E0 FB 0B       	        mv      [res_etape],a
-0BF07D 12 07             	        jr      fini
-0BF07F                   	
-0BF07F                   	echec:
-0BF07F A8 E1 FB 0B       	        mv      [res_err],a
-0BF083 04 88 F0          	        call    linkbas
-0BF086                   	
-0BF086                   	fini:
-0BF086 9F                	        rc
-0BF087 07                	        retf
-0BF088                   	
-0BF088                   	; ---------------------------------------------------------------------------
-0BF088                   	; linkbas -- repris de BASEXTDR.ASM (bd_linkbas). Appel proche.
-0BF088                   	; ---------------------------------------------------------------------------
-0BF088                   	linkbas:
-0BF088 8C 0E FD 0B       	        mv      x,[baswrk]
-0BF08C 08 72             	        mv      a,072H
-0BF08E 45 40             	        add     x,a
-0BF090 04 A9 F0          	        call    lb_chercher
-0BF093 1C 13             	        jrc     lb_perdu
-0BF095 30 A5 CB          	        mv      (txtbas),y
-0BF098 04 A9 F0          	        call    lb_chercher
-0BF09B 1C 0B             	        jrc     lb_perdu
-0BF09D 30 A5 CE          	        mv      (datbas),y
-0BF0A0 08 00             	        mv      a,000H
-0BF0A2 30 B8 80 E6 3A    	        mv      [(iocsw)+03AH],a
-0BF0A7 06                	        ret
-0BF0A8                   	lb_perdu:
-0BF0A8 FF                	        reset
-0BF0A9                   	lb_chercher:
-0BF0A9 30 E0 24 D7       	        mv      (ch),[x++]
-0BF0AD 30 CC D6 06       	        mv      (cl),006H
-0BF0B1 09 41             	        mv      il,041H
-0BF0B3 05 E8 FF 0F       	        callf   iocs_call
-0BF0B7 06                	        ret
-0BF0B8                   	
-0BF0B8 54 34 38 20 20 20 	nom:    db      'T48     SYS'
-0BF0BE 20 20 53 59 53    	
-0BF0C3                   	
-0BF0C3                   	btm:
-0BF0C3                   	        assert  btm-start < 0300H
-0BF0C3                   	        end
+0BF000 08 83             	        mv      a,083H                  ; T483 signe ses octets (voir T484.ASM)
+0BF002 A8 DF FB 0B       	        mv      [res_id],a
+0BF006 08 00             	        mv      a,000H
+0BF008 A8 E0 FB 0B       	        mv      [res_etape],a
+0BF00C A8 E1 FB 0B       	        mv      [res_err],a
+0BF010 0D FF FF 0F       	        mv      y,0FFFFFH
+0BF014 AD E2 FB 0B       	        mv      [res_adr48],y
+0BF018 AD E5 FB 0B       	        mv      [res_adr41],y
+0BF01C AD E8 FB 0B       	        mv      [res_taille],y
+0BF020                   	
+0BF020                   	; --- etape 1 : 47h condense -------------------------------------------------
+0BF020 08 01             	        mv      a,001H
+0BF022 A8 E0 FB 0B       	        mv      [res_etape],a
+0BF026 30 CD D6 06 00    	        mvw     (cl),00006H
+0BF02B 09 47             	        mv      il,d6_condense
+0BF02D 05 E8 FF 0F       	        callf   iocs_call
+0BF031 1C 52             	        jrc     echec
+0BF033 04 8E F0          	        call    linkbas
+0BF036                   	
+0BF036                   	; --- etape 2 : 48h block_create_top, ET RIEN D'AUTRE ------------------------
+0BF036 08 02             	        mv      a,002H
+0BF038 A8 E0 FB 0B       	        mv      [res_etape],a
+0BF03C 30 CD D6 06 00    	        mvw     (cl),00006H
+0BF041 0C BE F0 0B       	        mv      x,nom
+0BF045 0D 17 0B 00       	        mv      y,demande
+0BF049 09 48             	        mv      il,d6_blk_cre_top
+0BF04B 05 E8 FF 0F       	        callf   iocs_call
+0BF04F 1C 34             	        jrc     echec
+0BF051 AD E2 FB 0B       	        mv      [res_adr48],y
+0BF055 04 8E F0          	        call    linkbas
+0BF058                   	
+0BF058                   	; --- etape 3 : relire l'adresse, puis la TAILLE dans l'en-tete --------------
+0BF058 08 03             	        mv      a,003H
+0BF05A A8 E0 FB 0B       	        mv      [res_etape],a
+0BF05E 30 CD D6 06 00    	        mvw     (cl),00006H
+0BF063 0C BE F0 0B       	        mv      x,nom
+0BF067 09 41             	        mv      il,d6_search_phys
+0BF069 05 E8 FF 0F       	        callf   iocs_call
+0BF06D 1C 16             	        jrc     echec
+0BF06F AD E5 FB 0B       	        mv      [res_adr41],y
+0BF073                   	
+0BF073 08 11             	        mv      a,011H                  ; champ « taille du bloc » de l'en-tete
+0BF075 45 50             	        add     y,a
+0BF077 95 05             	        mv      y,[y]                   ; les 3 octets de la taille
+0BF079 AD E8 FB 0B       	        mv      [res_taille],y
+0BF07D                   	
+0BF07D 08 05             	        mv      a,005H                  ; sequence complete
+0BF07F A8 E0 FB 0B       	        mv      [res_etape],a
+0BF083 12 07             	        jr      fini
+0BF085                   	
+0BF085                   	echec:
+0BF085 A8 E1 FB 0B       	        mv      [res_err],a
+0BF089 04 8E F0          	        call    linkbas
+0BF08C                   	
+0BF08C                   	fini:
+0BF08C 9F                	        rc
+0BF08D 07                	        retf
+0BF08E                   	
+0BF08E                   	; ---------------------------------------------------------------------------
+0BF08E                   	; linkbas -- repris de BASEXTDR.ASM (bd_linkbas). Appel proche.
+0BF08E                   	; ---------------------------------------------------------------------------
+0BF08E                   	linkbas:
+0BF08E 8C 0E FD 0B       	        mv      x,[baswrk]
+0BF092 08 72             	        mv      a,072H
+0BF094 45 40             	        add     x,a
+0BF096 04 AF F0          	        call    lb_chercher
+0BF099 1C 13             	        jrc     lb_perdu
+0BF09B 30 A5 CB          	        mv      (txtbas),y
+0BF09E 04 AF F0          	        call    lb_chercher
+0BF0A1 1C 0B             	        jrc     lb_perdu
+0BF0A3 30 A5 CE          	        mv      (datbas),y
+0BF0A6 08 00             	        mv      a,000H
+0BF0A8 30 B8 80 E6 3A    	        mv      [(iocsw)+03AH],a
+0BF0AD 06                	        ret
+0BF0AE                   	lb_perdu:
+0BF0AE FF                	        reset
+0BF0AF                   	lb_chercher:
+0BF0AF 30 E0 24 D7       	        mv      (ch),[x++]
+0BF0B3 30 CC D6 06       	        mv      (cl),006H
+0BF0B7 09 41             	        mv      il,041H
+0BF0B9 05 E8 FF 0F       	        callf   iocs_call
+0BF0BD 06                	        ret
+0BF0BE                   	
+0BF0BE 54 34 38 20 20 20 	nom:    db      'T48     SYS'
+0BF0C4 20 20 53 59 53    	
+0BF0C9                   	
+0BF0C9                   	btm:
+0BF0C9                   	        assert  btm-start < 0300H
+0BF0C9                   	        end
 
  - Symbols -
 
@@ -160,7 +163,7 @@
 0000D4h  bl
 0000ECh  bp_ram
 0000EAh  brkmsk
-0BF0C3h  btm
+0BF0C9h  btm
 0000D7h  ch
 0000D6h  cl
 0BFC29h  ctrl_disp
@@ -283,7 +286,7 @@
 0BFC96h  dotsop
 0E01C2h  drv_off
 0BFCA2h  d_link
-0BF07Fh  echec
+0BF085h  echec
 0000F6h  eih
 0000F5h  eil
 0000F4h  eoh
@@ -306,7 +309,7 @@
 000007h  fcs_verify_file
 000004h  fcs_write_block
 000006h  fcs_write_byte
-0BF086h  fini
+0BF08Ch  fini
 0BFC87h  font_00_1f
 0BFC90h  font_20_7f
 0BFC8Ah  font_80_9f
@@ -378,8 +381,8 @@
 0000F2h  ki
 0000F0h  ko
 0000F1h  koh
-0BF0A9h  lb_chercher
-0BF0A8h  lb_perdu
+0BF0AFh  lb_chercher
+0BF0AEh  lb_perdu
 0000FEh  lcc
 00A004h  lcd1_cmd
 002004h  lcd1_cmd_2000
@@ -406,9 +409,9 @@
 0BFC9Eh  lcd_height
 0BFCA1h  lcd_mode
 0BFC9Dh  lcd_width
-0BF088h  linkbas
+0BF08Eh  linkbas
 0BFC2Ah  linprn
-0BF0B8h  nom
+0BF0BEh  nom
 0000EDh  px
 0000EEh  py
 0BFCBBh  repeat_pitch
@@ -417,6 +420,7 @@
 0BFBE2h  res_adr48
 0BFBE1h  res_err
 0BFBE0h  res_etape
+0BFBDFh  res_id
 0BFBE8h  res_taille
 0000F9h  rxd
 0BFCDEh  s1_btm
@@ -455,4 +459,4 @@
 0000F8h  usr
 0BFD1Ah  usrwrk
 
-  No fatal error.  Code: 0BF000h - 0BF0C2h [      195 byte(s)]
+  No fatal error.  Code: 0BF000h - 0BF0C8h [      201 byte(s)]

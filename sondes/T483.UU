@@ -1,7 +1,7 @@
 100 '
 110 ' UUENCODE SELF-DECODER Ver1.20
 120 '
-130   FNAME$="T483    .OBJ"  ' Submitted 25/09/2026
+130   FNAME$="T483    .OBJ"  ' Submitted 26/09/2026
 140 '
 150 PRINT "UUENCODE SELF-DECODER"
 160 A$=""
@@ -38,11 +38,11 @@
 470 GOTO 440
 480 CALL &BFE00
 1001 'begin 644 T483.OBJ
-1002 'M_P`&`1##````\`O___\`#P@`J.#["ZCA^PL-__\/K>+["ZWE^PNMZ/L+"`&H8
-1003 'MX/L+,,W6!@`)1P7H_P\<4@2(\`@"J.#["S#-U@8`#+CP"PT7"P`)2`7H_P\<[
-1004 'M-*WB^PL$B/`(`ZC@^PLPS=8&``RX\`L)007H_P\<%JWE^PL($450E06MZ/L+H
-1005 'M"`6HX/L+$@>HX?L+!(CPGP>,#OT+"')%0`2I\!P3,*7+!*GP'`LPI<X(`#"X)
-1006 '?@.8Z!O\PX"37,,S6!@E!!>C_#P94-#@@("`@(%-94Z7+B
+1002 'M_P`&`1#)````\`O___\`#PB#J-_["P@`J.#["ZCA^PL-__\/K>+["ZWE^PNM7
+1003 'MZ/L+"`&HX/L+,,W6!@`)1P7H_P\<4@2.\`@"J.#["S#-U@8`#+[P"PT7"P`)'
+1004 'M2`7H_P\<-*WB^PL$CO`(`ZC@^PLPS=8&``R^\`L)007H_P\<%JWE^PL($450>
+1005 'ME06MZ/L+"`6HX/L+$@>HX?L+!([PGP>,#OT+"')%0`2O\!P3,*7+!*_P'`LPM
+1006 'EI<X(`#"X@.8Z!O\PX"37,,S6!@E!!>C_#P94-#@@("`@(%-94Z7+%
 1007 '``
 1008 'end
-1009 'size 211
+1009 'size 217

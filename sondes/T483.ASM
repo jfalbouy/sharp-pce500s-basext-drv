@@ -40,6 +40,7 @@
 
         include pce500.inc
 
+res_id:         equ     0BFBDFH         ; 083H = « c'est T483 qui a ecrit »
 res_etape:      equ     0BFBE0H
 res_err:        equ     0BFBE1H
 res_adr48:      equ     0BFBE2H
@@ -52,6 +53,8 @@ demande:        equ     000B17H         ; 2839 octets, comme T482
         pre_on
 
 start:
+        mv      a,083H                  ; T483 signe ses octets (voir T484.ASM)
+        mv      [res_id],a
         mv      a,000H
         mv      [res_etape],a
         mv      [res_err],a

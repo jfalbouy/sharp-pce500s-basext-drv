@@ -308,10 +308,22 @@ Elles distinguent les trois causes que T482 ne savait pas départager : une **re
 une adresse fausse, une **écriture** qui n'a pas lieu, ou quelque chose qui **écrase** `(txtbas)`
 après coup. `T484.BAS` les affiche étiquetées, puis rappelle l'état courant et la chaîne.
 
-⛔ **Plus de signature, dans les deux.** T482 a montré qu'elle n'arrivait pas à destination sans
-qu'on sache pourquoi, alors que les valeurs qui la précédaient y étaient. **L'octet d'étape fait le
-même travail avec une variable de moins** (`0` = sonde pas appelée), et le programme BASIC le remet
-à zéro après lecture : ce qu'il affiche vient toujours du dernier appel.
+### ⛔ Un marqueur doit dire QUI a écrit, pas seulement qu'on a écrit
+
+Trois fois de suite, le même piège a coûté une mesure — et chaque fois sous un autre déguisement :
+
+| Version | Ce qui a été cru | Ce qui était vrai |
+|---|---|---|
+| T48 v1 | « zone de résultat à zéro = sonde pas appelée » | la zone langage machine **n'est pas remise à zéro** : `BLOC CREE EN 9F9F00`, de la mémoire quelconque lue comme un résultat |
+| T482 | « une signature écrite en dernier prouve l'appel » | la signature **n'est jamais arrivée**, alors que les cinq valeurs qui la précédaient y étaient : la sonde a été déclarée non appelée après un succès complet |
+| T484 | « l'octet d'étape suffit : `0` = pas appelée » | l'étape **`5` restait de T483**, qui partage la même zone et n'avait pas pu l'effacer (il était mort sur `Out of memory`). Lancé **avant** le `LOAD M`, `T484.BAS` a affiché `ETAPE 5 ERR 0` et des adresses de fantaisie — `544F52`, `495349` : du texte, pas des adresses |
+
+La leçon, à la troisième : **une zone de résultat persistante n'est pas un canal**. Il y faut une
+marque qui dise **qui** a écrit. Chaque sonde **signe** donc désormais ses octets, en `0BFBDFh` et
+dès sa première instruction — `083h` pour T483, `084h` pour T484 —, et son programme BASIC refuse
+les octets d'une autre (« T484 PAS ENCORE APPELEE (ID 83) »), puis efface la signature après
+lecture. Une sonde interrompue en route reste reconnaissable : c'est tout l'intérêt d'écrire
+l'identifiant **avant** le travail, et non après.
 
 ### Et ensuite
 
