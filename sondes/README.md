@@ -325,6 +325,32 @@ les octets d'une autre (« T484 PAS ENCORE APPELEE (ID 83) »), puis efface la s
 lecture. Une sonde interrompue en route reste reconnaissable : c'est tout l'intérêt d'écrire
 l'identifiant **avant** le travail, et non après.
 
+### Le relevé passe par un fichier, pas par des photos d'écran
+
+Un écran de quatre lignes et vingt-cinq valeurs ne font pas bon ménage : on photographie ce qu'on
+peut, et ce qu'on rate manque à l'analyse. `T484.BAS` écrit donc **tout** dans
+**`F:T484RES.BAS`** en même temps qu'à l'écran, par l'idiome éprouvé de `BASEXT/essais/MODDIAG.BAS` :
+
+```basic
+ 80 CLS :OPEN "F:T484RES.BAS" FOR OUTPUT AS #1
+910 PRINT L$:PRINT #1, L$:RETURN
+```
+
+Le fichier se récupère ensuite de l'émulateur et se lit d'un bloc. Il porte les seize valeurs de
+la trace **étiquetées** (`L1-CHERCHE1`, `L1-TXT`…), l'état courant de `(txtbas)`/`(datbas)`, puis
+la chaîne des blocs.
+
+⚠️ **Sans `MID$` ni `STR$`** : aucun des deux n'apparaît dans le corpus, donc rien ne garantit leur
+syntaxe sur cette machine. Les étiquettes sont écrites en toutes lettres, une ligne par valeur.
+
+**Pour revoir le relevé sans rappeler la sonde** — le programme efface la signature après lecture,
+mais la trace, elle, reste :
+
+```basic
+POKE &BFBDF,&84
+RUN
+```
+
 ### Et ensuite
 
 La question qui vaut le détour, et qu'on ne posera qu'une fois ces deux-là répondues :
