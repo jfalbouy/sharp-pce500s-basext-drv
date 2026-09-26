@@ -2,10 +2,10 @@
 ; pce500.inc - constantes systeme du SHARP PC-E500S / SC62015
 ; ============================================================================
 ;
-; GENERE automatiquement par tools/generate_pce500_inc.py a partir des tables
+; GENERE automatiquement par xasm2026-4/tools/generate_pce500_inc.py a partir des tables
 ; du desassembleur SC62015Disassembler (Data/*.json), source autoritative alignee
 ; sur le listing de reference. NE PAS EDITER A LA MAIN : regenerer depuis les tables.
-; Genere le 2026-09-14.
+; Genere le 2026-09-26.
 ;
 ; Usage :   include pce500.inc
 ;
@@ -218,38 +218,38 @@ dev_function:     equ 9H    ; device 9 ()
 ; clavier et printer_check sur l'imprimante). Le nom complet d'origine ouvre le
 ; commentaire, de sorte qu'un grep sur display_guide_line retrouve d0_guide_line.
 ; device 0 : display (STDO:/SCRN:)
-d0_char_out_at:   equ 41H   ; display_char_out_at - affichage d'un caractere a une position quelconque ((bl) = X, (bh) = Y, a = cara
-d0_chars_out_at:  equ 42H   ; display_chars_out_at - affichage d'une chaine a une position quelconque ((bl) = X, (bh) = Y, X = adress
-d0_set_cursor:    equ 44H   ; display_set_cursor - positionnement du curseur, sans changer sa forme ((bl) = X, (bh) = Y ; cy=1 si h
-d0_cursor_type:   equ 45H   ; display_cursor_type - forme du curseur (a : bit 5 = curseur affiche, bit 3 = clignotement, bits 2-0 =
-d0_symbol_disp:   equ 46H   ; display_symbol_disp - allumage ou extinction des symboles de l'ecran (a = motif, un bit a 1 allume ; (
+d0_char_out_at:   equ 41H   ; display_char_out_at - affichage d'un caractere a une position quelconque ((bl) = X, (bh) = Y, a = ...
+d0_chars_out_at:  equ 42H   ; display_chars_out_at - affichage d'une chaine a une position quelconque ((bl) = X, (bh) = Y, X = ...
+d0_set_cursor:    equ 44H   ; display_set_cursor - positionnement du curseur, sans changer sa forme ((bl) = X, (bh) = Y ; cy=1 si ...
+d0_cursor_type:   equ 45H   ; display_cursor_type - forme du curseur (a : bit 5 = curseur affiche, bit 3 = clignotement, bits 2-0 = ...
+d0_symbol_disp:   equ 46H   ; display_symbol_disp - allumage ou extinction des symboles de l'ecran (a = motif, un bit a 1 allume ...
 d0_scroll_up:     equ 47H   ; display_scroll_up - defilement vers le haut de n lignes ((bx) = 00000h, a = nombre de lignes)
 d0_scroll_down:   equ 48H   ; display_scroll_down - defilement vers le bas de n lignes ((bx) = 00000h, a = nombre de lignes)
 d0_clear_line:    equ 49H   ; display_clear_line - effacement d'une ligne ((bh) = ordonnee de la ligne)
-d0_dot8_write:    equ 4AH   ; display_dot8_write - affichage d'un motif de 8 points, en colonne vers le bas (X, Y = coin superieur,
-d0_dot8_read:     equ 4BH   ; display_dot8_read - lecture d'un motif de 8 points, en colonne vers le bas (X, Y = coin superieur ;
-d0_dot_write:     equ 4CH   ; display_dot_write - affichage d'un point (X = abscisse, Y = ordonnee, a = 0 allumer, 1 eteindre, 2 i
-d0_dot_read:      equ 4DH   ; display_dot_read - lecture d'un point (X = abscisse, Y = ordonnee ; retour a = 1 si le point est al
-d0_line_draw:     equ 4EH   ; display_line_draw - trace d'une ligne (X,Y = point de depart, (bx),(dx) = point d'arrivee ; le mode
-d0_box_fill:      equ 4FH   ; display_box_fill - remplissage d'un rectangle defini par les deux bouts d'une diagonale (X,Y et (bx
+d0_dot8_write:    equ 4AH   ; display_dot8_write - affichage d'un motif de 8 points, en colonne vers le bas (X, Y = coin ...
+d0_dot8_read:     equ 4BH   ; display_dot8_read - lecture d'un motif de 8 points, en colonne vers le bas (X, Y = coin superieur ...
+d0_dot_write:     equ 4CH   ; display_dot_write - affichage d'un point (X = abscisse, Y = ordonnee, a = 0 allumer, 1 eteindre, 2 ...
+d0_dot_read:      equ 4DH   ; display_dot_read - lecture d'un point (X = abscisse, Y = ordonnee ; retour a = 1 si le point est ...
+d0_line_draw:     equ 4EH   ; display_line_draw - trace d'une ligne (X,Y = point de depart, (bx),(dx) = point d'arrivee ; le mode ...
+d0_box_fill:      equ 4FH   ; display_box_fill - remplissage d'un rectangle defini par les deux bouts d'une diagonale (X,Y et ...
 d0_disp_state:    equ 50H   ; display_disp_state - allumage ou extinction de l'affichage (a = 0 eteint, 1 allume)
 d0_clear_disp:    equ 51H   ; display_clear_disp - effacement complet de l'affichage ((cx) = 0000h)
-d0_clear_from:    equ 52H   ; display_clear_from - effacement a partir d'une position (a = nombre de caracteres, (bl) = X, (bh) = Y
+d0_clear_from:    equ 52H   ; display_clear_from - effacement a partir d'une position (a = nombre de caracteres, (bl) = X, (bh) = ...
 d0_insert_line:   equ 54H   ; display_insert_line - insertion de n lignes ((bh) = Y de depart, a = nombre de lignes)
-d0_pattern_read:  equ 55H   ; display_pattern_read - lecture du motif de points d'une ligne vers la memoire externe ((bh) = ordonnee,
-d0_pattern_write: equ 56H   ; display_pattern_write - ecriture du motif de points d'une ligne depuis la memoire externe ((bh) = ordonn
-d0_disp_no_clip:  equ 57H   ; display_disp_no_clip - affichage d'un caractere SANS tenir compte de la fenetre d'affichage ((bl) = X,
-d0_guide_line:    equ 58H   ; display_guide_line - affichage de chaines encadrees d'un guide ((bl) = X, (bh) = Y, a = nombre de cha
+d0_pattern_read:  equ 55H   ; display_pattern_read - lecture du motif de points d'une ligne vers la memoire externe ((bh) = ...
+d0_pattern_write: equ 56H   ; display_pattern_write - ecriture du motif de points d'une ligne depuis la memoire externe ((bh) = ...
+d0_disp_no_clip:  equ 57H   ; display_disp_no_clip - affichage d'un caractere SANS tenir compte de la fenetre d'affichage ((bl) = X ...
+d0_guide_line:    equ 58H   ; display_guide_line - affichage de chaines encadrees d'un guide ((bl) = X, (bh) = Y, a = nombre de ...
 
 ; device 1 : key (STDI:/KYBD:)
-d1_conv_tbl_set:  equ 3FH   ; key_conv_table_set - installe les SIX pointeurs de tables de conversion code matriciel -> code caract
-d1_init_driver:   equ 40H   ; key_init_driver - initialisation du driver clavier (a = niveau : 0 all reset, 1 reset, 2 off, 3 on
-d1_matrix_read:   equ 41H   ; key_matrix_read - lecture du code matrice dans le tampon de balayage (retour a : bit 7 = 1 touche
-d1_mtx_rd_nd:     equ 42H   ; key_matrix_read_nd - lecture non destructive du code matrice : meme rendu que 041h, sans consommer la
-d1_key_read:      equ 43H   ; key_key_read - lecture d'une touche, apres traitement des touches SHIFT et CTRL (a bit 7 = 0 re
-d1_key_buf_set:   equ 44H   ; key_key_buffer_set - ecriture de donnees dans le tampon clavier (X = adresse des donnees, a = nombre
+d1_conv_tbl_set:  equ 3FH   ; key_conv_table_set - installe les SIX pointeurs de tables de conversion code matriciel -> code ...
+d1_init_driver:   equ 40H   ; key_init_driver - initialisation du driver clavier (a = niveau : 0 all reset, 1 reset, 2 off, 3 ...
+d1_matrix_read:   equ 41H   ; key_matrix_read - lecture du code matrice dans le tampon de balayage (retour a : bit 7 = 1 touche ...
+d1_mtx_rd_nd:     equ 42H   ; key_matrix_read_nd - lecture non destructive du code matrice : meme rendu que 041h, sans consommer ...
+d1_key_read:      equ 43H   ; key_key_read - lecture d'une touche, apres traitement des touches SHIFT et CTRL (a bit 7 = 0 ...
+d1_key_buf_set:   equ 44H   ; key_key_buffer_set - ecriture de donnees dans le tampon clavier (X = adresse des donnees, a = nombre ...
 d1_buffer_clear:  equ 45H   ; key_buffer_clear - vidage du tampon de balayage et du tampon clavier
-d1_fkey_display:  equ 46H   ; key_fkey_display - affichage ou effacement des libelles de touches de fonction (retour cy=1 si l'ec
+d1_fkey_display:  equ 46H   ; key_fkey_display - affichage ou effacement des libelles de touches de fonction (retour cy=1 si ...
 
 ; device 2 : sio (COM:)
 d2_byte_out:      equ 41H   ; sio_byte_out - sortie directe d'un octet
@@ -267,43 +267,43 @@ d2_read_cd:       equ 4BH   ; sio_read_cd - lecture du port CD (retour cy=0 etat
 ; device 3 : printer (STDL:/PRN:)
 d3_print_out:     equ 41H   ; printer_print_out - envoi d'un octet a l'imprimante (a = donnee ; cy=1 en erreur)
 d3_print_pos:     equ 42H   ; printer_print_pos - position courante de la tete d'impression (retour a = position)
-d3_printer_check: equ 43H   ; printer_printer_check - test de l'imprimante (retour cy=0 : a = type d'imprimante, i = nombre maximal de
+d3_printer_check: equ 43H   ; printer_printer_check - test de l'imprimante (retour cy=0 : a = type d'imprimante, i = nombre maximal ...
 
 ; device 4 : tape (CAS:)
-d4_data_write:    equ 41H   ; tape_data_write - ecriture d'un bloc de donnees sur la bande (X = adresse, Y = taille ; retour X e
-d4_data_read:     equ 42H   ; tape_data_read - lecture d'un bloc de donnees depuis la bande (X = adresse, Y = taille ; retour X
-d4_data_verify:   equ 43H   ; tape_data_verify - lecture et comparaison d'un bloc de donnees (X = adresse, Y = taille ; retour X
+d4_data_write:    equ 41H   ; tape_data_write - ecriture d'un bloc de donnees sur la bande (X = adresse, Y = taille ; retour X ...
+d4_data_read:     equ 42H   ; tape_data_read - lecture d'un bloc de donnees depuis la bande (X = adresse, Y = taille ; retour ...
+d4_data_verify:   equ 43H   ; tape_data_verify - lecture et comparaison d'un bloc de donnees (X = adresse, Y = taille ; retour X ...
 d4_header_write:  equ 44H   ; tape_header_write - ecriture du bloc d'en-tete sur la bande (X = adresse du bloc d'en-tete)
 d4_header_read:   equ 45H   ; tape_header_read - lecture du bloc d'en-tete depuis la bande (X = adresse du bloc d'en-tete)
 
 ; device 5 : memfile (E:/F:/G:)
 
 ; device 6 : memcard (S1:/S2:/S3:)
-d6_search_phys:   equ 41H   ; memcard_search_phys - adresse physique d'un bloc d'apres son nom ((ch) = slot 0/1/2, X = nom du bloc ;
-d6_block_resize:  equ 42H   ; memcard_block_resize - changement de taille d'un bloc ((ch) = slot, a = numero de pointeur de zone libr
-d6_blk_xfer:      equ 43H   ; memcard_block_transfer - transfert d'un bloc (X = source, Y = destination, (si) = taille ; retour X et Y
-d6_block_rename:  equ 44H   ; memcard_block_rename - renommage d'un bloc ((ch) = slot, X = ancien nom, Y = nouveau nom ; erreur a = 0
-d6_block_create:  equ 45H   ; memcard_block_create - creation d'un bloc memoire ((ch) = slot, X = nom ; retour Y = adresse du bloc cr
-d6_block_delete:  equ 46H   ; memcard_block_delete - suppression d'un bloc memoire ((ch) = slot, X = nom ; erreur a = 002h bloc intro
+d6_search_phys:   equ 41H   ; memcard_search_phys - adresse physique d'un bloc d'apres son nom ((ch) = slot 0/1/2, X = nom du bloc ...
+d6_block_resize:  equ 42H   ; memcard_block_resize - changement de taille d'un bloc ((ch) = slot, a = numero de pointeur de zone ...
+d6_blk_xfer:      equ 43H   ; memcard_block_transfer - transfert d'un bloc (X = source, Y = destination, (si) = taille ; retour X et Y ...
+d6_block_rename:  equ 44H   ; memcard_block_rename - renommage d'un bloc ((ch) = slot, X = ancien nom, Y = nouveau nom ; erreur a = ...
+d6_block_create:  equ 45H   ; memcard_block_create - creation d'un bloc memoire ((ch) = slot, X = nom ; retour Y = adresse du bloc ...
+d6_block_delete:  equ 46H   ; memcard_block_delete - suppression d'un bloc memoire ((ch) = slot, X = nom ; erreur a = 002h bloc ...
 d6_condense:      equ 47H   ; memcard_condense - compactage de l'espace libre des blocs memoire ((ch) = slot)
-d6_blk_cre_top:   equ 48H   ; memcard_block_create_top - creation d'un bloc memoire EN TETE des blocs, propre au PC-E500 ((ch) = slot, X
+d6_blk_cre_top:   equ 48H   ; memcard_block_create_top - cree un bloc VIDE de 22h octets EN TETE ; la taille passee dans Y est IGNOREE ...
 
 ; device 7 : fdd (X:/Y:)
 
 ; device 8 : system (SYSTM:)
 d8_power_off:     equ 41H   ; system_power_off - extinction : arret du CPU, retour par la touche ON
-d8_secure_work:   equ 42H   ; system_secure_work - redimensionnement d'une zone de travail systeme (X = l'un des 21 pointeurs de 0B
-d8_basic_exec:    equ 43H   ; system_basic_exec - execution d'une chaine en code intermediaire BASIC (X = adresse ; a bit0 pas a p
-d8_code_addr:     equ 45H   ; system_code_addr - adresse de traitement d'une instruction d'apres son code intermediaire (a = code
+d8_secure_work:   equ 42H   ; system_secure_work - redimensionnement d'une zone de travail systeme (X = l'un des 21 pointeurs de ...
+d8_basic_exec:    equ 43H   ; system_basic_exec - execution d'une chaine en code intermediaire BASIC (X = adresse ; a bit0 pas a ...
+d8_code_addr:     equ 45H   ; system_code_addr - adresse de traitement d'une instruction d'apres son code intermediaire (a = ...
 
 ; device 9 : function ()
-d9_num_ne:        equ 41H   ; function_num_ne - comparaison numerique Y<>X (X = (bp)-(bp+14), Y = (bp+15)-(bp+29)); (ch)=1 : add
-d9_num_lt:        equ 42H   ; function_num_lt - comparaison numerique Y<X; (ch)=1 : soustraction (matrice); (ch)=2 : regression
+d9_num_ne:        equ 41H   ; function_num_ne - comparaison numerique Y<>X (X = (bp)-(bp+14), Y = (bp+15)-(bp+29)); (ch)=1 ...
+d9_num_lt:        equ 42H   ; function_num_lt - comparaison numerique Y<X; (ch)=1 : soustraction (matrice); (ch)=2 : regression ...
 d9_num_gt:        equ 43H   ; function_num_gt - comparaison numerique Y>X; (ch)=1 : multiplication (matrice)
 d9_num_eq:        equ 44H   ; function_num_eq - comparaison numerique Y=X; (ch)=1 : division (matrice)
 d9_num_le:        equ 45H   ; function_num_le - comparaison numerique Y<=X; (ch)=1 : inverse (matrice)
 d9_num_ge:        equ 46H   ; function_num_ge - comparaison numerique Y>=X; (ch)=1 : addition d'un scalaire (matrice)
-d9_add:           equ 47H   ; function_add - addition Y+X -> X (X = (bp)-(bp+14), Y = (bp+15)-(bp+29)); (ch)=1 : soustraction
+d9_add:           equ 47H   ; function_add - addition Y+X -> X (X = (bp)-(bp+14), Y = (bp+15)-(bp+29)); (ch)=1 ...
 d9_sub:           equ 48H   ; function_sub - soustraction Y-X -> X; (ch)=1 : multiplication par un scalaire (matrice)
 d9_mul:           equ 49H   ; function_mul - multiplication Y*X -> X; (ch)=1 : multiplication par X-1 scalaire (matrice)
 d9_div:           equ 4AH   ; function_div - division Y/X -> X; (ch)=1 : remplacer X par Y (matrice)
@@ -316,7 +316,7 @@ d9_asin:          equ 50H   ; function_asin - arc sinus sin-1X -> X; (ch)=1 : ra
 d9_acos:          equ 51H   ; function_acos - arc cosinus cos-1X -> X; (ch)=1 : ajouter M et X (matrice)
 d9_atan:          equ 52H   ; function_atan - arc tangente tan-1X -> X; (ch)=1 : ranger X dans MA-MZ (matrice)
 d9_deg:           equ 53H   ; function_deg - conversion en degres X->DEG->X; (ch)=1 : rappeler MA-MZ dans X (matrice)
-d9_dms:           equ 54H   ; function_dms - conversion en degres-minutes-secondes X->DMS->X; (ch)=1 : systeme d'equations (m
+d9_dms:           equ 54H   ; function_dms - conversion en degres-minutes-secondes X->DMS->X; (ch)=1 : systeme d'equations ...
 d9_abs:           equ 55H   ; function_abs - valeur absolue |X| -> X; (ch)=1 : reste d'un systeme d'equations (matrice)
 d9_int:           equ 56H   ; function_int - partie entiere intX -> X
 d9_sgn:           equ 57H   ; function_sgn - signe sgnX -> X
