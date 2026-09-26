@@ -250,6 +250,37 @@ Même protocole que T482 (réserver, `LOAD M "X:T483.OBJ"`, `RUN`, `CALL &BF000`
 `RUN`), même nettoyage `SET`/`KILL` **tapé**. La sonde compacte, donc elle appelle `linkbas`
 derrière chaque commande qui déplace, erreurs comprises.
 
+### ✅ Résultat — PC-E500S réel, J.-F. Albouy, 2026-09-26
+
+**`48h` crée un bloc VIDE.** `FILES "S1:"` après l'appel :
+
+```
+T48     .SYS        0    S1:
+DATA    .BAS      367
+TEXT    .BAS     1300
+FUNCKEY .          70
+```
+
+`FILES` affiche la taille du bloc **moins `22h`** (`03` §7bis) : **0 affiché = bloc de 34 octets**,
+l'en-tête et rien d'autre. La taille demandée — 2839 octets dans `Y` — **a été ignorée**.
+
+**Ce que cela tranche :**
+
+1. ✅ **La lecture de la ROM avait raison, et le carnet est à corriger.** `Data/FCSFunctions.json`
+   décrit `48h` comme « `(ch)` = slot, `X` = nom, **`Y` = taille** ; retour `Y` = adresse du bloc
+   créé ». `Y` n'est pas une taille : il est **écrasé** dès la deuxième instruction du traitement
+   (`call SUB_F0244`, `0F0351h`), et le gabarit copié donne au bloc une taille de `22h`.
+2. ✅ **La séquence `48h` → `42h` n'est donc pas un confort, c'est une obligation** : la ROM crée
+   le bloc vide, puis le dimensionne. C'est bien ce que faisait T482, et c'est ce qui explique son
+   bloc de 2873 octets — **c'est `42h` qui l'a donné**, pas `48h`.
+
+**Et un effet de bord qu'il fallait voir** : la sonde s'est arrêtée sur **`Out of memory in 80`**,
+c'est-à-dire à la création de sa quatrième variable. Après le compactage, `DATA.BAS` est retombée
+de **253 958 à 367 octets** — sa taille réelle. ⚠️ **Le compactage retire donc au BASIC sa réserve
+de variables**, et un programme qui appelle `47h` peut mourir juste après, non pas d'un défaut de
+la commande mais de la place qu'elle a reprise. L'installateur, lui, ne fait que passer : il
+compacte, insère, et rend la main une fois le bloc en place.
+
 ## T484 — la trace de `linkbas` : où `(txtbas)` décroche-t-il ?
 
 T482 a laissé une anomalie que rien n'explique : `(datbas)` juste, `(txtbas)` périmé. C'est le
