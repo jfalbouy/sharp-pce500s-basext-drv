@@ -340,8 +340,17 @@ Le fichier se récupère ensuite de l'émulateur et se lit d'un bloc. Il porte l
 la trace **étiquetées** (`L1-CHERCHE1`, `L1-TXT`…), l'état courant de `(txtbas)`/`(datbas)`, puis
 la chaîne des blocs.
 
-⚠️ **Sans `MID$` ni `STR$`** : aucun des deux n'apparaît dans le corpus, donc rien ne garantit leur
-syntaxe sur cette machine. Les étiquettes sont écrites en toutes lettres, une ligne par valeur.
+Les étiquettes sont écrites **en toutes lettres, une ligne par valeur** : c'est plus lisible dans
+le fichier, et cela évite d'avoir à découper une chaîne de libellés.
+
+⛔ **Ma première rédaction disait « sans `MID$` ni `STR$`, aucun des deux n'apparaît dans le
+corpus, donc rien ne garantit leur syntaxe ».** C'est faux, et c'est le piège que la méthode du
+projet nomme : **une absence n'est une information que si la recherche sait trouver une
+présence.** Le témoin positif existait à deux pas — la table des 168 mots-clés de la ROM :
+`MID$` = `0EAh`, `LEFT$` = `0EBh`, `RIGHT$` = `0ECh`, `STR$` = `0F1h`, `VAL` = `0D1h`
+(`Renum Basic Sharp/Documentation/Codes_BASIC_PC-E500S_corrige.csv`). Signalé par
+J.-F. Albouy le 2026-09-26. Les quelques programmes d'essai du corpus ne s'en servaient pas,
+voilà tout.
 
 **Pour revoir le relevé sans rappeler la sonde** — le programme efface la signature après lecture,
 mais la trace, elle, reste :
