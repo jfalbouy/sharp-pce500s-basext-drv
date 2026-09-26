@@ -264,6 +264,10 @@ FUNCKEY .          70
 `FILES` affiche la taille du bloc **moins `22h`** (`03` §7bis) : **0 affiché = bloc de 34 octets**,
 l'en-tête et rien d'autre. La taille demandée — 2839 octets dans `Y` — **a été ignorée**.
 
+✅ **Recoupé par la sonde elle-même** : `PEEK` de sa zone de résultat donne `5 0` (séquence
+complète, aucune erreur) et **`000022`** pour la taille qu'elle a lue dans l'en-tête à `+11h`.
+Deux chemins indépendants, la même valeur.
+
 **Ce que cela tranche :**
 
 1. ✅ **La lecture de la ROM avait raison, et le carnet est à corriger.** `Data/FCSFunctions.json`
