@@ -416,6 +416,43 @@ D'où un bloc de 2873 octets contenant un fichier de 0. C'est exactement la situ
 **Pour un pilote, c'est le bloc qui compte** : la place est là. Reste à savoir qui doit renseigner
 `+16h` — l'installateur lui-même, vraisemblablement, comme il pose déjà l'attribut `25h`.
 
+## T485 — le `CALL` du BASIC restaure-t-il `(txtbas)` à son retour ?
+
+T484 a montré que la valeur est juste **à la sortie de la sonde** et ancienne quand le programme
+la relit. Restait à savoir qui la réécrit. ✅ **La lecture de la ROM répond par l'élimination** :
+`(txtbas)` n'est écrit qu'en **quatre** endroits, et tous les quatre passent par la même
+résolution **vivante** — `IOCS 41h search_phys` sur le nom rangé dans la zone de travail du BASIC :
+
+| Écriture | D'où vient la valeur |
+|---|---|
+| `0F9984h` | `SUB_FA51C`, après `SUB_F96F1` sur le nom en `[basptr]+73h` |
+| `0F99B1h` | `SUB_F96CE`, qui **écrit** d'abord le nom en `[basptr]+72h` |
+| `0F9D28h` | `SUB_FA555` (qui résout aussi `(datbas)` juste avant, par `SUB_FA537`) |
+| `0FA56Bh` | `SUB_FA555` elle-même |
+
+```
+0F96F1  mv il,041h
+0F96F3  mv (cl),006h  /  callf iocs_call      <- recherche par le nom, pas un cache
+```
+
+**Aucune ne peut donc rendre une adresse périmée.** La valeur ancienne ne vient pas d'une
+réécriture : elle vient d'une **restauration**. Et la ROM sauve bien `(txtbas)` quelque part —
+`0FA219h` fait `mvp (bp+000h),(txtbas)`.
+
+`T485.BAS` le met à l'épreuve **sans aucun objet à charger** : il pose lui-même son talon de deux
+octets (`9F` `rc`, `07` `retf`) en `0BF000h`, écrit dans `(txtbas)` une valeur **reconnaissable et
+sans danger** — l'adresse de `DATA.BAS`, un bloc réel —, appelle le talon, relit, et **restaure
+immédiatement** la valeur d'origine dans la même séquence d'instructions.
+
+| Ce qu'il affiche | Ce que cela veut dire |
+|---|---|
+| `LE CALL NE RESTAURE PAS` | la valeur écrite survit : l'anomalie vient d'ailleurs, et il faudra chercher du côté de `RUN` |
+| `LE CALL RESTAURE (TXTBAS)` | le `CALL` du BASIC sauve et rend la RAM interne : **tout installateur qui écrit `(txtbas)` depuis un `CALL` voit son écriture défaite**, et c'est une règle à écrire en gros |
+| une troisième valeur | à relever telle quelle |
+
+⚠️ La valeur d'essai n'existe que le temps d'une ligne, et c'est une adresse de bloc valide : si
+quelque chose la déréférence entre le `POKE` et la restauration, il lit un en-tête réel.
+
 ### Et ensuite
 
 La question qui vaut le détour, et qu'on ne posera qu'une fois ces deux-là répondues :
