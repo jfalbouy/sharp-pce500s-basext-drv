@@ -765,6 +765,46 @@ nécessaire.
 ⚠️ Même un écart confirmé ne prouve pas un danger : il reste à mesurer ce que fait **une
 réservation pendant la fenêtre de retard**. Cette sonde établit seulement si cette fenêtre existe.
 
+
+### ✅ Résultat — émulateur PockEmul (PC-E500S), J.-F. Albouy, 2026-09-27
+
+Relevé écrit par la machine (`F:TS1TRES.BAS`) :
+
+```
+TS1T INSTANTANES :  3
+ 1 FIN BD61A TAIL BD61B BTM BD61B
+  EN PHASE : TAIL = FIN + 1
+ 2 FIN 818F8 TAIL 80DE2 BTM BD61B
+  ECART -2839 OCTETS
+ 3 FIN BD61A TAIL BD61B BTM BD61B
+  EN PHASE : TAIL = FIN + 1
+```
+
+1. ✅ **Le témoin est en phase** : avant l'installation, `s1_tail` = `FIN` + 1, et la chaîne est
+   jointive (`FIN` = `S1BTM` − 1). La sonde lit donc ce qu'il faut, et l'interprétation de
+   `0BFC1Bh` tient.
+2. ✅ **Juste après l'installation, `s1_tail` est en retard d'exactement 2839 octets**, la taille
+   du bloc `BASEXT.SYS`. L'arithmétique le confirme : `818F8` − 2839 (`B17h`) = `80DE1`, et
+   `80DE1` + 1 = `80DE2`. C'est la fin de chaîne que `47h` a laissée, **avant** la montée manuelle
+   des blocs. Le mécanisme lu dans la ROM est confirmé : `47h` met `s1_tail` à jour, l'insertion à
+   la main ne le fait pas.
+3. 📖 **La fenêtre est large, mais peu dangereuse en pratique.** Juste après l'installation, la
+   chaîne se termine en `818F8`, loin sous `S1BTM` (`BD61B`), car `47h` a rendu à la zone libre toute
+   la réserve de `DATA.BAS`. Une réservation acceptée à tort devrait descendre `s1_btm` sous
+   `818F8`, soit réserver environ 245 Ko d'un coup. Le risque reste théorique tant que le BASIC n'a
+   pas rattrapé la valeur.
+
+4. ✅ **Le BASIC rattrape `s1_tail` au premier `RUN`.** L'instantané 3, pris après un `RUN`
+   le pilote toujours installé, est de nouveau **en phase**. `DATA.BAS` a repris toute la zone
+   libre (`FIN` = `BD61A` = `S1BTM` − 1), par un `42h`, qui passe par `SUB_F029D`. La fenêtre de
+   retard va donc de la fin de l'installation au premier besoin de mémoire du BASIC.
+
+**Conclusion** : le retard de `s1_tail` laissé par l'insertion manuelle est **réel, exact et
+passager**. Il ne dure que jusqu'au premier `42h`, et pendant ce temps une réservation ne
+pourrait mordre sur la chaîne qu'en réservant environ 245 Ko. **L'installateur n'a pas besoin de
+correction.** Si l'on voulait fermer la fenêtre quand même, il suffirait qu'il écrive la vraie fin
+de chaîne + 1 en `[s1_tail]` après la montée des blocs, comme le fait `SUB_F029D`.
+
 ### Construire
 
 ```powershell
