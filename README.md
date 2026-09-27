@@ -151,6 +151,17 @@ KILL "S1:BASEXT.SYS"
 ⚠️ **Ne jamais `KILL` sans `CALL &BF000 "-U"` avant** : les crochets du BASIC et le filtre de
 `XCONSOLE` pointeraient dans de la mémoire libérée.
 
+⛔ **Créer le disque `E:` AVANT d'installer le pilote, jamais après.** `INIT "E:…"` crée son bloc
+`RAMFILE` par l'IOCS `48h`, **en tête** de `S1:`, donc **sous** `BASEXT.SYS`, qui monte alors de
+la taille du disque sans être relogé. Le maillon `d_link` et les crochets désigneraient
+l'ancienne adresse, et la machine tomberait au premier appel. Mesuré sur émulateur PockEmul le 2026-09-27 avec un leurre
+(`sondes/README.md`, TRAMF : `INIT "E:2K"` a fait monter le bloc de 2048 octets). La règle vaut
+pour **tous** les pilotes de `S1:` (PLINK, HISTORY…), et pour `INIT "E:0K"`, qui retire le
+bloc et fait redescendre ce qui est au-dessus : c'est déduit du `KILL` d'un pilote placé sous un
+autre (mesuré), pas mesuré directement. Si `E:` doit changer : désinstaller les pilotes,
+faire l'`INIT`, puis réinstaller. Autre parade, mesurée le même jour : installer `EXTSLOT` (E. Kako, 1991)
+**avant** l'`INIT` ; il fait naître `RAMFILE` derrière les pilotes (`sondes/README.md`, TRAMF B).
+
 ⛔ **Ne jamais retirer un pilote installé SOUS `BASEXT.SYS` sans détacher BASEXT d'abord.** Mesuré
 le 2026-09-25 : `KILL "S1:PLINK.SYS"`, PLINK étant sous nous, fait **tomber la machine** (hard
 RESET). Notre bloc descend de la taille du disparu sans être relogé, et la tête de `d_link` comme

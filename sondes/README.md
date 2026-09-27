@@ -614,6 +614,101 @@ Il est réassemblé depuis `extslot.asm`, identique à l'octet à l'objet d'épo
 | B | `RAMFILE` **au rang 3**, au-dessus d'EXTSLOT | ✅ EXTSLOT fait ce que dit sa notice sur un PC-E500S, **et** l'IOCS retient bien le premier en-tête de device 6 |
 | B | `RAMFILE` au rang 1 | EXTSLOT n'a pas intercepté `48h` : le choix de l'en-tête par l'IOCS n'est pas celui qu'on croit |
 
+### ✅ Résultat du protocole A — émulateur PockEmul (PC-E500S), J.-F. Albouy, 2026-09-27
+
+**`INIT "E:2K"` a créé `RAMFILE` au rang 1, sous le leurre, et l'a fait monter de 2048 octets.**
+Relevés écrits par la machine (`F:TRAMFA.BAS`, `F:TRAMFL.BAS`, `F:TRAMFR.BAS`), recopiés tels quels :
+
+```
+TRAMF ETAT A                        TRAMF ETAT L                        TRAMF ETAT R
+SONDE PAS ENCORE APPELEE (ID 2)     SONDE : ETAPE 6 ERR 0 LEURRE 80018  SONDE : ETAPE 6 ERR 0 LEURRE 80018
+                                     1 80018 LEURRE  SYS 25     34      1 80018 RAMFILE     20   2048
+ 1 80018 DATA    BAS 20 252361       2 8003A DATA    BAS 20 252327      2 80818 LEURRE  SYS 25     34
+ 2 BD9E1 TEXT    BAS 20   2923       3 BD9E1 TEXT    BAS 20   2923      3 8083A DATA    BAS 20 250279
+ 3 BE54C FUNCKEY     20    104       4 BE54C FUNCKEY     20    104      4 BD9E1 TEXT    BAS 20   2923
+ 4 BE5B4 AER         20    102       5 BE5B4 AER         20    102      5 BE54C FUNCKEY     20    104
+FIN BE61A S1BTM BE61B               FIN BE61A S1BTM BE61B               6 BE5B4 AER         20    102
+                                                                        FIN BE61A S1BTM BE61B
+                                                                        RAMFILE AU RANG 1 SOUS LE LEURRE (RANG 2)
+```
+
+`FILES "S1:"` confirme à l'écran : `RAMFILE` 2014, `LEURRE.SYS P` 0, puis `DATA`, `TEXT`,
+`FUNCKEY`, `AER`. Après le nettoyage (`INIT "E:0K"`, `SET`/`KILL`), la chaîne est revenue à son
+état A : `DATA`, `TEXT`, `FUNCKEY`, `AER`.
+
+**Ce que cela établit :**
+
+1. ✅ **La lecture de la ROM est juste** : `INIT "E:"` passe par `48h`, qui crée `RAMFILE` **en
+   tête** du lecteur, sous tout bloc déjà là, **pilotes compris**. Le leurre est passé de `80018`
+   à `80818` sans que rien ne le reloge.
+2. ⛔ **Avec un vrai pilote à la place du leurre, la machine serait tombée.** Son maillon `d_link`
+   et ses crochets désigneraient l'ancienne adresse : c'est le mécanisme du `KILL` sous un pilote,
+   et du REGIST3 déplacé relevé par TMAP (référentiel `03` §7bis). **Règle : créer `E:` AVANT
+   d'installer un pilote** — ou installer EXTSLOT d'abord (protocole B, pas encore passé).
+3. ✅ **`INIT` fait lui-même la place.** Avant lui, la chaîne était de nouveau jointive (relevé L :
+   `FIN BE61A` = `S1BTM` − 1, `DATA.BAS` ayant regrossi au `RUN`). `48h` seul aurait donc refusé
+   (T48), et pourtant l'`INIT` a réussi. La place a été prise **à `DATA.BAS`**, qui perd exactement 2048 octets
+   (252 327 → 250 279), et les blocs au-dessus de `DATA.BAS` **n'ont pas bougé** (`TEXT.BAS` reste
+   en `BD9E1`). Seul ce qui est **sous** `DATA.BAS` monte : c'est bien là que vivent les pilotes.
+4. ✅ **Le bloc `RAMFILE` fait exactement 2048 octets pour `E:2K`**, en-tête compris ;
+   `FILES` en affiche 2014 = 2048 − `22h`. Son attribut est **`20h`** (celui du gabarit de `48h`),
+   alors que le `RAMFILE` préinstallé dans l'image `rom83` porte `21h`.
+5. ✅ **La pose du leurre** par `47h` → `48h` → `41h` est propre : bloc de 34 octets en `80018`,
+   attribut `25h`, affiché `P` (protégé) par `FILES`, et retiré sans incident par `SET`/`KILL`.
+6. ✅ **La signature a joué son rôle** : le relevé A a lu l'identifiant `02` laissé par une autre
+   sonde, et a refusé ses octets.
+
+
+### ✅ Résultat du protocole B — émulateur PockEmul (PC-E500S), J.-F. Albouy, 2026-09-27
+
+**EXTSLOT a intercepté le `48h` d'`INIT "E:2K"` : `RAMFILE` est né au rang 3, derrière les deux
+« pilotes », et aucun d'eux n'a bougé.** Relevés écrits par la machine :
+
+```
+TRAMF ETAT X (avant l'INIT)              TRAMF ETAT Y (apres l'INIT)
+SONDE : ETAPE 6 ERR 0 LEURRE 80018       SONDE : ETAPE 6 ERR 0 LEURRE 80018
+ 1 80018 LEURRE  SYS 25     34            1 80018 LEURRE  SYS 25     34
+ 2 8003A EXTSLOT SYS 25    520            2 8003A EXTSLOT SYS 25    520
+ 3 80242 DATA    BAS 20 246085            3 80242 RAMFILE     20   2048
+ 4 BC387 TEXT    BAS 20   2923            4 80A42 DATA    BAS 20 244037
+ 5 BCEF2 FUNCKEY     20    104            5 BC387 TEXT    BAS 20   2923
+ 6 BCF5A AER         20    102            6 BCEF2 FUNCKEY     20    104
+ 7 BCFC0 ENG     $$$ 20   1626            7 BCF5A AER         20    102
+FIN BD61A S1BTM BD61B                     8 BCFC0 ENG     $$$ 20   1626
+D_LINK 8005C EXTSLOT+22H 8005C           FIN BD61A S1BTM BD61B
+DELIER : POKE &BFCA2,&20,&F8,&D          D_LINK 8005C EXTSLOT+22H 8005C
+                                         RAMFILE AU RANG 3 AU-DESSUS DU LEURRE (RANG 1)
+                                         PILOTE REEL AU RANG 2
+                                         RAMFILE AU-DESSUS DU PILOTE REEL
+```
+
+**Ce que cela établit :**
+
+1. ✅ **EXTSLOT 1.02 (1991) fonctionne sur la ROM 8.3 du PC-E500S.** Il s'est installé **derrière**
+   le leurre (rang 2, en `8003A`), comme son installateur le prévoit : il saute les blocs dont
+   l'attribut a les bits `0Ch`. Son bloc fait **520 octets** (`208h`, en-tête compris ;
+   `FILES` : 486 = 520 − 34), et son en-tête IOCS est en tête de `d_link`
+   (`8005C` = bloc + `22h`). Sa relocation écrite à la main a tenu : le pilote s'exécute bien depuis son bloc.
+2. ✅ **L'IOCS retient le PREMIER en-tête de `d_link` qui porte le numéro de device demandé.**
+   EXTSLOT (device 6, en tête) a répondu à la place du device 6 de la ROM. Le référentiel `03` §7
+   ne faisait que le lire.
+3. ✅ **`RAMFILE` naît derrière les pilotes**, et ni le leurre ni EXTSLOT n'ont bougé (`80018` et
+   `8003A` avant comme après). La place vient encore de `DATA.BAS` (−2048 exactement), et `TEXT.BAS`
+   reste en `BC387`.
+4. ✅ **Le maillon suivant d'EXTSLOT est `0DF820h`, la tête de la chaîne de la ROM**
+   (`POKE &BFCA2,&20,&F8,&D`) : il avait été chaîné en premier, sur une chaîne sans autre pilote.
+5. 📖 Au passage, un bloc `ENG     $$$` (1626 octets) est apparu : c'est le fichier de travail de la
+   ROM, déjà connu (référentiel `03` §7bis, « Autres faits »), sans lien avec l'essai.
+
+✅ **Le retrait d'EXTSLOT par la procédure du protocole s'est fait sans incident** : `INIT "E:0K"`, le
+`POKE &BFCA2,&20,&F8,&D` qui le délie, puis `SET`/`KILL` d'EXTSLOT et du leurre. `FILES "S1:"`
+montre ensuite `DATA`, `TEXT`, `FUNCKEY`, `AER`, l'état de départ. Un pilote sans désinstallateur
+se retire donc proprement, pourvu qu'il soit en tête de `d_link`.
+
+**Conséquence pratique** : sur une machine qui porte des pilotes, EXTSLOT rend `INIT "E:…"` **sûr**,
+à condition d'être installé **avant** l'`INIT`. Il ne protège ni contre `INIT "E:0K"`, qui ne passe
+pas par `48h`, ni contre le `KILL` d'un bloc placé sous un pilote.
+
 ---
 
 ## TS1T — `s1_tail` (`0BFC1Bh`) est-elle en retard après une insertion manuelle ?
