@@ -5,7 +5,7 @@
 ; GENERE automatiquement par xasm2026-4/tools/generate_pce500_inc.py a partir des tables
 ; du desassembleur SC62015Disassembler (Data/*.json), source autoritative alignee
 ; sur le listing de reference. NE PAS EDITER A LA MAIN : regenerer depuis les tables.
-; Genere le 2026-09-26.
+; Genere le 2026-09-27.
 ;
 ; Usage :   include pce500.inc
 ;
@@ -76,6 +76,7 @@ s2_top:           equ 0BFC0FH ; lead address du slot 1 = lecteur S2:, 040000h su
 s2_cap:           equ 0BFC12H ; capacite du slot 1 (S2:) en blocs de 2 Ko (2 octets ; manuel technique, Parameter of memory block device)
 s1_top:           equ 0BFC15H ; top of S1 (nom et libelle de REGISTER.ASM) ; lead address du slot 0 = lecteur S1:, 080000h sur PC-E500S (3 octets ; manuel technique, Parameter of memory block device)
 s1_cap:           equ 0BFC18H ; capacite du slot 0 (S1:) en blocs de 2 Ko (2 octets ; manuel technique, Parameter of memory block device)
+s1_tail:          equ 0BFC1BH ; fin de la chaine des blocs de S1: + 1 (3 octets) : ecrite par SUB_F029D (commandes 42h/45h/46h/47h/48h du device 6), comparee a s1_btm par la reservation (0E0571h) ; nom de E. Kako (EXTSLOT, 1991). Un installateur ...
 scrn_crsr_x:      equ 0BFC27H ; X du curseur du peripherique stdo:/scrn:
 scrn_crsr_y:      equ 0BFC28H ; Y du curseur du peripherique stdo:/scrn:
 ctrl_disp:        equ 0BFC29H ; code de controle affiche au lieu d'etre execute (bit 6)

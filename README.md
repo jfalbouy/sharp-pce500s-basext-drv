@@ -185,6 +185,9 @@ BASEXT-DRV/
 │   └── KILLSOUS.BAS      KILL d'un pilote installe SOUS le notre (CONCEPTION §4.3)
 ├── sondes/
 │   ├── T48.ASM/.BAS      la commande IOCS 48h cree-t-elle un bloc en tete ?
+│   ├── T482..T485        la voie ROM 47h -> 48h -> 42h, et la trace de linkbas
+│   ├── TRAMF.ASM/.BAS    INIT "E:" cree-t-il RAMFILE SOUS les pilotes ? (leurre)
+│   ├── TS1T.ASM/.BAS     s1_tail (0BFC1Bh) est-elle en retard apres l'installation ?
 │   └── README.md         ce que la ROM en dit, le protocole, comment lire le resultat
 └── outils/
     ├── construire.py     table, assemblage, controles, moteur C

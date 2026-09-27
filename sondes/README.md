@@ -1,6 +1,6 @@
 # Sondes — mesurer ce que la ROM fait déjà
 
-*Rédigé le 2026-09-25 — mis à jour le 2026-09-25*
+*Rédigé le 2026-09-25 — mis à jour le 2026-09-27*
 
 Ce dossier porte des **sondes** : de petits programmes qui posent **une** question à la machine et
 rendent sa réponse, sans rien installer de durable. Ils ne font pas partie du pilote.
@@ -504,6 +504,142 @@ La question qui vaut le détour, et qu'on ne posera qu'une fois ces deux-là ré
 **l'installateur peut-il passer de « compacter, décaler, insérer, recaler » à « `47h`, `48h`,
 `42h`, recaler » ?** T482 dit que la voie existe ; elle ne dit pas encore qu'elle est sûre.
 
+📖 **Réponse de lecture (2026-09-27) : non, pas dès qu'un pilote est installé.** `EXTSLOT` (E. Kako,
+1991) est une copie du traitement `48h` de la ROM. Il ajoute une seule boucle, qui crée le bloc
+**derrière** les pilotes, alors que `48h` le crée **sous** eux. La voie ROM ne vaut donc que sur une
+chaîne vide de pilotes. La question devient : **qui, dans la ROM, appelle `48h` ?** Réponse lue :
+le pilote MEMORY FILE, pour son `RAMFILE` — la sonde TRAMF ci-dessous. Référentiel, `03` §7bis.
+
+---
+
+## TRAMF — `INIT "E:"` crée-t-il `RAMFILE` sous les pilotes ?
+
+📖 **Ce que la ROM en dit** (`rom83`, lu le 2026-09-27) : le pilote MEMORY FILE (`E:`/`F:`) appelle
+`48h` du device 6 sur le nom `RAMFILE` (`0E4DBBh` → `SUB_E4C4E`, nom en `0E4C63h`). Or `48h` crée
+**en tête** du lecteur. Si c'est bien `INIT "E:…"` qui passe par là, créer le disque RAM après avoir
+installé PLINK, BASEXT ou HISTORY glisse `RAMFILE` **sous** eux. Ils montent sans relocation, et la
+machine tombe, comme au `KILL` d'un pilote installé sous un autre (`essais/KILLSOUS.BAS`).
+C'est le défaut que la notice d'EXTSLOT décrit, et qu'EXTSLOT corrige.
+
+⛔ **On ne le mesure pas avec un vrai pilote** : si l'hypothèse est juste, la machine plante, et
+peut exiger un hard RESET. `TRAMF.ASM` (180 octets) pose un **leurre** : un bloc `LEURRE  SYS`
+d'attribut **`25h`**. Pour PLINKC, EXTSLOT et BASEXTDR, c'est un pilote (bits `0Ch`), mais il n'est
+relié à rien : ni maillon `d_link`, ni crochet du BASIC. S'il monte, aucun pointeur ne devient faux.
+La pose tient dans un seul `CALL` : `47h` → `linkbas` → `48h` (bloc vide de `22h` octets, T483) →
+`linkbas` → `41h` relit l'adresse → attribut `25h` en `+0Ch`.
+
+Zone de résultat : identifiant **`0A5h`** en `0BFBDFh`, écrit en premier. L'étape est en `0BFBE0h`
+(`6` = leurre posé), le code d'erreur en `0BFBE1h` et l'adresse du leurre en `0BFBE2h`.
+
+`TRAMF.BAS` liste la chaîne avec le rang, l'adresse, le nom, l'attribut et la taille de chaque
+bloc, puis tranche sur les **rangs** du leurre et de `RAMFILE` — pas sur leurs adresses, que le
+programme fait bouger en s'exécutant. S'il trouve `EXTSLOT.SYS`, il affiche aussi le `POKE` qui le
+délie de `d_link` (partie B).
+
+### Protocole A — la ROM seule
+
+⚠️ **Préalables, faute de quoi l'essai devient celui qu'on veut éviter :**
+- **aucun vrai pilote installé** : `FILES "S1:"` ne montre ni `PLINK.SYS`, ni `BASEXT.SYS`, ni
+  `HISTORY.SYS`. Les fichiers se chargent donc depuis `F:` (copiés auparavant) ou par la liaison
+  série, jamais par `L:` ;
+- **pas de disque `E:`** : sinon, `INIT "E:0K"` d'abord (il **efface** `E:` — sauvegarder avant).
+
+1. `POKE &BFE03,&1A,&FD,&B,0,&C,0 : CALL &FFFD8` — réserver 3072 octets ;
+2. `LOAD M "F:TRAMF.OBJ"`, puis charger `TRAMF.BAS` ;
+3. **`RUN`** — relevé **avant** : « SONDE PAS ENCORE APPELEE », pas de leurre ;
+4. ⚠️ **en mode direct**, `CALL &BF000` ;
+5. **`RUN`** — attendu : `ETAPE 6 ERR 0`, et `LEURRE  SYS` **au rang 1**, attribut `25` ;
+6. **en mode direct**, `INIT "E:2K"`, confirmer par `Y` ;
+7. **`RUN`** — le verdict ;
+8. nettoyer, en mode direct : `INIT "E:0K"`, puis `SET "S1:LEURRE.SYS"," "` et
+   `KILL "S1:LEURRE.SYS"`.
+
+### Protocole B — le contre-essai avec EXTSLOT
+
+Il vérifie aussi un point que le référentiel n'a fait que lire (`03` §7) : l'IOCS retient le
+**premier** en-tête de `d_link` qui porte le numéro de device demandé. EXTSLOT, installé derrière le
+leurre, doit intercepter le `48h` d'`INIT "E:"` à la place de la ROM.
+
+L'objet vient de `C:\Claude\EXTSLOT\EXTSLOT.UU`, **hors de ce dépôt** : c'est un logiciel tiers.
+Il est réassemblé depuis `extslot.asm`, identique à l'octet à l'objet d'époque, et se charge en
+`0BE000h`, 1 163 octets.
+
+1. `POKE &BFE03,&1A,&FD,&B,0,&1C,0 : CALL &FFFD8` — réserver 7168 octets (zone de `0BE000h` à
+   `0BFBFFh`) ;
+2. `LOAD M "F:EXTSLOT.OBJ"`, `LOAD M "F:TRAMF.OBJ"`, puis charger `TRAMF.BAS` ;
+3. **en mode direct**, `CALL &BF000` — le leurre, au rang 1 ;
+4. **en mode direct**, `CALL &BE000` — attendu : `EXTSLOT V1.02 by E.Kako` / `Installed.`, et
+   `EXTSLOT SYS` **au rang 2**, derrière le leurre ;
+5. **en mode direct**, `INIT "E:2K"`, confirmer par `Y` ;
+6. **`RUN`** — le verdict. Noter aussi la ligne `DELIER : POKE &BFCA2,…` ;
+7. nettoyer, **dans cet ordre**, en mode direct :
+   1. `INIT "E:0K"` ;
+   2. **le `POKE &BFCA2,…` affiché** — il délie EXTSLOT de `d_link`. ⛔ Ne jamais faire de
+      `KILL` sur `EXTSLOT.SYS` sans ce `POKE` : `d_link` désignerait de la mémoire libérée. Si
+      `TRAMF.BAS` répond « PAS EN TETE DE D_LINK », un autre pilote a été chaîné après EXTSLOT :
+      s'arrêter là ;
+   3. `SET "S1:EXTSLOT.SYS"," "` puis `KILL "S1:EXTSLOT.SYS"` ;
+   4. `SET "S1:LEURRE.SYS"," "` puis `KILL "S1:LEURRE.SYS"`.
+
+### Ce que chaque issue apprendrait
+
+| Essai | Relevé | Lecture |
+|---|---|---|
+| A | `RAMFILE` **au rang 1, sous le leurre** | ✅ l'hypothèse tient : **`INIT "E:"` après un pilote plante la machine**. Règle : créer `E:` avant d'installer, ou installer EXTSLOT d'abord. À écrire dans les modes d'emploi de BASEXT-DRV, HISTDRV et PLINKC |
+| A | `RAMFILE` **au-dessus du leurre** | la lecture de la ROM est fausse quelque part, ou `INIT "E:"` passe par un autre chemin que `0E4DBBh` : chercher lequel |
+| A | « PAS DE RAMFILE DANS S1: » | `INIT "E:"` ne crée pas de bloc dans `S1:`, ou pas sous ce nom : relever la chaîne entière et comparer |
+| B | `RAMFILE` **au rang 3**, au-dessus d'EXTSLOT | ✅ EXTSLOT fait ce que dit sa notice sur un PC-E500S, **et** l'IOCS retient bien le premier en-tête de device 6 |
+| B | `RAMFILE` au rang 1 | EXTSLOT n'a pas intercepté `48h` : le choix de l'en-tête par l'IOCS n'est pas celui qu'on croit |
+
+---
+
+## TS1T — `s1_tail` (`0BFC1Bh`) est-elle en retard après une insertion manuelle ?
+
+📖 **Ce que la ROM en dit** (`rom83`, lu le 2026-09-27) : `[0BFC1Bh]` vaut la fin de la chaîne des
+blocs de `S1:` + 1. Elle est tenue à jour par `SUB_F029D`, que seules appellent les commandes du
+device 6 qui changent la chaîne (`42h`, `45h`, `46h`, `47h`, `48h`). `0E0571h` la compare à
+`[s1_btm]`, vraisemblablement pour qu'une réservation ne morde pas sur la chaîne. Notre installateur
+compacte par `47h`, qui la met à jour, puis **monte les blocs à la main** de la taille du pilote,
+sans la toucher. PLINKC et EXTSLOT font de même.
+
+⛔ **Le piège de la mesure, payé le 2026-09-26** : lancer un programme BASIC fait grandir `DATA.BAS`
+par `42h`, donc passe par `SUB_F029D`, donc **corrige** `s1_tail`. Un relevé fait en BASIC
+effacerait ce qu'il cherche. `TS1T.ASM` (100 octets, en **`0BF800h`**) prend donc un **instantané**
+à chaque `CALL` en mode direct, sans créer de variable. L'instantané fige au même instant la vraie
+fin de chaîne (même parcours que `SUB_F0278`, **sans** y écrire), `[s1_tail]` et `[s1_btm]`.
+`TS1T.BAS` ne fait que relire les instantanés, après coup. En phase, `s1_tail` = `FIN` + 1.
+
+Zone de résultat : identifiant **`0A6h`** en `0BFBDFh`, nombre d'instantanés (4 au plus) en
+`0BFBE0h`, instantanés de 9 octets à partir de `0BFB80h`. La série repart de zéro dès que
+l'identifiant n'est plus le sien (`POKE &BFBDF,0`).
+
+### Protocole
+
+Même préalable que pour l'installation de BASEXT-DRV (`../README.md`) ; aucun autre pilote n'est
+nécessaire.
+
+1. `POKE &BFE03,&1A,&FD,&B,0,&18,0 : CALL &FFFD8` — 6144 octets : `BASEXTDR` occupe
+   `0BE400h`-`0BF5B7h`, `TS1T` se loge en `0BF800h` ;
+2. `LOAD M "F:BASEXTDR.OBJ"`, `LOAD M "F:TS1T.OBJ"`, charger `TS1T.BAS`, puis `POKE &BFBDF,0` ;
+3. **en mode direct**, `CALL &BF800` — instantané 1, **le témoin** ;
+4. **en mode direct**, `CALL &BF000` (installation), puis **aussitôt** `CALL &BF800` — instantané 2 ;
+5. **`RUN`** — relit 1 et 2 ; en s'exécutant, le programme fait grandir `DATA.BAS` ;
+6. **en mode direct**, `CALL &BF800` — instantané 3, puis **`RUN`** ;
+7. désinstaller comme d'habitude : `CALL &BF000 "-U"`, puis `SET`/`KILL` (`../README.md`).
+
+### Ce que chaque issue apprendrait
+
+| Instantané | Relevé | Lecture |
+|---|---|---|
+| 1 | **EN PHASE** | ✅ le témoin : la sonde lit ce qu'il faut. ⛔ Sinon, **s'arrêter** — l'interprétation de `s1_tail` est fausse, et les instantanés suivants ne diraient rien |
+| 2 | **ÉCART −2839** (la taille du bloc de BASEXT-DRV) | ✅ l'installateur laisse `s1_tail` en retard de toute la taille du pilote |
+| 2 | EN PHASE | quelque chose la recale pendant l'installation (le message affiché ?) : chercher quoi |
+| 3 | EN PHASE | ✅ le BASIC la rattrape au premier `42h`. La fenêtre de retard va de l'installation au premier besoin de mémoire |
+| 3 | toujours en écart | le retard dure : il faudra mesurer ce que fait alors une réservation (`CALL &FFFD8`), et l'installateur devra écrire `s1_tail` lui-même |
+
+⚠️ Même un écart confirmé ne prouve pas un danger : il reste à mesurer ce que fait **une
+réservation pendant la fenêtre de retard**. Cette sonde établit seulement si cette fenêtre existe.
+
 ### Construire
 
 ```powershell
@@ -512,6 +648,15 @@ C:\Claude\xasm2026-4\bin\xasm2026-4.exe T48.ASM -OT48.OBJ -L -S -B -K
 C:\Claude\xasm2026-4\bin\xasm2026-4.exe T482.ASM -OT482.OBJ -L -S -B -K
 C:\Claude\xasm2026-4\bin\xasm2026-4.exe T483.ASM -OT483.OBJ -L -S -B -K
 C:\Claude\xasm2026-4\bin\xasm2026-4.exe T484.ASM -OT484.OBJ -L -S -B -K
+C:\Claude\xasm2026-4\bin\xasm2026-4.exe TRAMF.ASM -OTRAMF.OBJ -L -S -B -K
+C:\Claude\xasm2026-4\bin\xasm2026-4.exe TS1T.ASM -OTS1T.OBJ -L -S -B -K
+```
+
+Et pour le contre-essai, hors dépôt :
+
+```powershell
+cd C:\Claude\EXTSLOT
+C:\Claude\xasm2026-4\bin\xasm2026-4.exe extslot.asm -OEXTSLOT.OBJ -B -K   # puis .uu -> .UU
 ```
 
 `pce500.inc` est une **copie** de `../src/pce500.inc`, elle-même générée : ne pas l'éditer. Le `.uu`

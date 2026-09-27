@@ -1,0 +1,406 @@
+000000                   	; ============================================================================
+000000                   	; TS1T -- s1_tail (0BFC1Bh) SUIT-IL LA VRAIE FIN DE CHAINE ?  UN INSTANTANE
+000000                   	; ============================================================================
+000000                   	; s1_tail est la fin de la chaine des blocs de S1: + 1. La ROM la tient a jour
+000000                   	; dans SUB_F029D, que seules appellent les commandes du device 6 qui changent la
+000000                   	; chaine (42h, 45h, 46h, 47h, 48h). Elle la compare a s1_btm en 0E0571h,
+000000                   	; vraisemblablement pour qu'une reservation ne morde pas sur la chaine.
+000000                   	;
+000000                   	; Nos installateurs (et PLINKC, et EXTSLOT) compactent par 47h -- qui la met a
+000000                   	; jour -- puis MONTENT les blocs a la main, de la taille du pilote, sans la
+000000                   	; toucher. Question : juste apres, s1_tail est-elle en retard de cette taille ?
+000000                   	; Et qui la rattrape ?
+000000                   	;
+000000                   	; ⛔ LE PIEGE DE LA MESURE (2026-09-26) : lancer un programme BASIC fait grandir
+000000                   	;    DATA.BAS par 42h, donc appelle SUB_F029D, donc CORRIGE s1_tail. Un releve en
+000000                   	;    BASIC effacerait ce qu'il cherche. D'ou cette sonde : un CALL en mode direct
+000000                   	;    ne cree aucune variable, et l'instantane fige FIN, s1_tail et s1_btm AU MEME
+000000                   	;    INSTANT. TS1T.BAS ne fait que relire les instantanes, plus tard.
+000000                   	;
+000000                   	; Chaque appel ajoute un instantane (4 au plus). La serie repart de zero des que
+000000                   	; l'identifiant n'est plus le sien (autre sonde, ou POKE &BFBDF,0).
+000000                   	;
+000000                   	; Zone de resultat (signee, voir T484) :
+000000                   	;   0BFBDFh  1 octet   IDENTIFIANT 0A6H
+000000                   	;   0BFBE0h  1 octet   nombre d'instantanes (0..4)
+000000                   	;   0BFB80h  4 x 9     par instantane : FIN (1er octet hors chaine, 3 o),
+000000                   	;                      [s1_tail] (3 o), [s1_btm] (3 o). En phase : s1_tail = FIN + 1
+000000                   	;
+000000                   	; Chargee en 0BF800h : BASEXTDR occupe 0BE400h-0BF5B7h dans la meme reservation
+000000                   	; de 6144 octets, et les deux doivent etre en memoire avant l'installation.
+000000                   	;
+000000                   	; Assemblage : xasm2026-4 TS1T.ASM -OTS1T.OBJ -L -S -B -K
+000000                   	; ============================================================================
+000000                   	
+000000                   	        include pce500.inc
+000000                   	s1_top:           equ 0BFC15H ; top of S1 (nom et libelle de REGISTER.ASM) ; lead address du slot 0 = lecteur S1:, 080000h sur PC-E500S (3 octets ; manuel technique, Parameter of memory block device)
+000000                   	s1_tail:          equ 0BFC1BH ; fin de la chaine des blocs de S1: + 1 (3 octets) : ecrite par SUB_F029D (commandes 42h/45h/46h/47h/48h du device 6), comparee a s1_btm par la reservation (0E0571h) ; nom de E. Kako (EXTSLOT, 1991). Un installateur ...
+000000                   	s1_btm:           equ 0BFCDEH ; bottom of S1 (nom et libelle de REGISTER.ASM) ; le manuel dit "last address of slot 0 (S1:) + 1" et La Feuille du Sharp en fait le pointeur de la 1re zone de travail, la pile utilisateur U : trois lectures d'une me ...
+000000                   	
+000000                   	res_id:         equ     0BFBDFH         ; 0A6H = « c'est TS1T qui a ecrit »
+000000                   	res_n:          equ     0BFBE0H
+000000                   	res_tab:        equ     0BFB80H
+000000                   	
+0BF800                   	        org     0BF800H
+0BF800                   	        pre_on
+0BF800                   	
+0BF800                   	start:
+0BF800 88 DF FB 0B       	        mv      a,[res_id]
+0BF804 60 A6             	        cmp     a,0A6H
+0BF806 18 0C             	        jrz     suite
+0BF808 08 A6             	        mv      a,0A6H                  ; nouvelle serie
+0BF80A A8 DF FB 0B       	        mv      [res_id],a
+0BF80E 08 00             	        mv      a,000H
+0BF810 A8 E0 FB 0B       	        mv      [res_n],a
+0BF814                   	suite:
+0BF814 88 E0 FB 0B       	        mv      a,[res_n]
+0BF818 60 04             	        cmp     a,004H
+0BF81A 1E 46             	        jrnc    plein                   ; quatre instantanes : on n'ecrase rien
+0BF81C                   	
+0BF81C 0D 80 FB 0B       	        mv      y,res_tab               ; Y = res_tab + 9 * n
+0BF820 09 09             	        mv      il,009H
+0BF822 60 00             	rang:   cmp     a,000H
+0BF824 18 06             	        jrz     rang_ok
+0BF826 45 51             	        add     y,il
+0BF828 48 01             	        sub     a,001H
+0BF82A 13 0A             	        jr      rang
+0BF82C                   	rang_ok:
+0BF82C 2D                	        pushu   y                       ; destination de l'instantane
+0BF82D                   	
+0BF82D                   	; --- la vraie fin de chaine : meme parcours que SUB_F0278, SANS y ecrire ----
+0BF82D 8D 15 FC 0B       	        mv      y,[s1_top]
+0BF831 94 85 12          	        mv      x,[y+012H]
+0BF834 45 54             	        add     y,x
+0BF836 90 05             	parc:   mv      a,[y]
+0BF838 60 FB             	        cmp     a,0FBH
+0BF83A 1A 0D             	        jrnz    fin
+0BF83C 94 85 11          	        mv      x,[y+011H]              ; taille du bloc
+0BF83F 6C 04             	        inc     x
+0BF841 7C 04             	        dec     x
+0BF843 18 04             	        jrz     fin                     ; taille nulle : chaine abimee, on s'arrete
+0BF845 45 54             	        add     y,x
+0BF847 1F 13             	        jrnc    parc
+0BF849                   	fin:
+0BF849 3C                	        popu    x
+0BF84A B5 24             	        mv      [x++],y                 ; FIN
+0BF84C 8D 1B FC 0B       	        mv      y,[s1_tail]
+0BF850 B5 24             	        mv      [x++],y                 ; s1_tail
+0BF852 8D DE FC 0B       	        mv      y,[s1_btm]
+0BF856 B5 24             	        mv      [x++],y                 ; s1_btm
+0BF858                   	
+0BF858 88 E0 FB 0B       	        mv      a,[res_n]
+0BF85C 40 01             	        add     a,001H
+0BF85E A8 E0 FB 0B       	        mv      [res_n],a
+0BF862                   	plein:
+0BF862 9F                	        rc                              ; retour propre a BASIC
+0BF863 07                	        retf
+0BF864                   	
+0BF864                   	btm:
+0BF864                   	        assert  res_tab+4*9 <= res_id   ; les instantanes n'atteignent pas l'identifiant
+0BF864                   	        assert  btm < res_tab           ; la sonde reste sous sa zone de resultat
+0BF864                   	        end
+
+ - Symbols -
+
+0000EFh  amc
+0BFCBCh  apo_time
+0000D1h  basptr
+0BFD0Eh  baswrk
+0000D5h  bh
+0000D4h  bl
+0000ECh  bp_ram
+0000EAh  brkmsk
+0BF864h  btm
+0000D7h  ch
+0000D6h  cl
+0BFC29h  ctrl_disp
+00004Fh  d0_box_fill
+000042h  d0_chars_out_at
+000041h  d0_char_out_at
+000051h  d0_clear_disp
+000052h  d0_clear_from
+000049h  d0_clear_line
+000045h  d0_cursor_type
+000057h  d0_disp_no_clip
+000050h  d0_disp_state
+00004Bh  d0_dot8_read
+00004Ah  d0_dot8_write
+00004Dh  d0_dot_read
+00004Ch  d0_dot_write
+000058h  d0_guide_line
+000054h  d0_insert_line
+00004Eh  d0_line_draw
+000055h  d0_pattern_read
+000056h  d0_pattern_write
+000048h  d0_scroll_down
+000047h  d0_scroll_up
+000044h  d0_set_cursor
+000046h  d0_symbol_disp
+000045h  d1_buffer_clear
+00003Fh  d1_conv_tbl_set
+000046h  d1_fkey_display
+000040h  d1_init_driver
+000044h  d1_key_buf_set
+000043h  d1_key_read
+000041h  d1_matrix_read
+000042h  d1_mtx_rd_nd
+000042h  d2_byte_in
+000041h  d2_byte_out
+000048h  d2_er_high
+000049h  d2_er_low
+00004Bh  d2_read_cd
+00004Ah  d2_read_cs
+000046h  d2_rr_high
+000047h  d2_rr_low
+000044h  d2_rs_high
+000045h  d2_rs_low
+000043h  d2_set_hardware
+000043h  d3_printer_check
+000041h  d3_print_out
+000042h  d3_print_pos
+000042h  d4_data_read
+000043h  d4_data_verify
+000041h  d4_data_write
+000045h  d4_header_read
+000044h  d4_header_write
+000048h  d6_blk_cre_top
+000043h  d6_blk_xfer
+000045h  d6_block_create
+000046h  d6_block_delete
+000044h  d6_block_rename
+000042h  d6_block_resize
+000047h  d6_condense
+000041h  d6_search_phys
+000043h  d8_basic_exec
+000045h  d8_code_addr
+000041h  d8_power_off
+000042h  d8_secure_work
+000055h  d9_abs
+000051h  d9_acos
+000047h  d9_add
+000076h  d9_asc
+000050h  d9_asin
+000052h  d9_atan
+00007Fh  d9_bin2dec
+000077h  d9_chr_s
+00004Eh  d9_cos
+00007Eh  d9_dec2bin
+000053h  d9_deg
+00004Ah  d9_div
+000054h  d9_dms
+00004Ch  d9_exp
+000056h  d9_int
+00005Bh  d9_ln
+00005Ah  d9_log
+000049h  d9_mul
+000044h  d9_num_eq
+000046h  d9_num_ge
+000043h  d9_num_gt
+000045h  d9_num_le
+000042h  d9_num_lt
+000041h  d9_num_ne
+00004Bh  d9_pow
+000058h  d9_rnd
+000057h  d9_sgn
+00004Dh  d9_sin
+000059h  d9_sqr
+000073h  d9_str_eq
+000075h  d9_str_ge
+000072h  d9_str_gt
+000074h  d9_str_le
+000071h  d9_str_lt
+000070h  d9_str_ne
+000078h  d9_str_s
+000048h  d9_sub
+00004Fh  d9_tan
+000079h  d9_val
+0000CEh  datbas
+0BFC7Dh  defdrv
+000000h  dev_display
+000007h  dev_fdd
+000009h  dev_function
+000001h  dev_key
+000006h  dev_memcard
+000005h  dev_memfile
+000003h  dev_printer
+000002h  dev_sio
+000008h  dev_system
+000004h  dev_tape
+0000D9h  dh
+0000DDh  di
+0000D8h  dl
+0BFC96h  dotsop
+0E01C2h  drv_off
+0BFCA2h  d_link
+0000F6h  eih
+0000F5h  eil
+0000F4h  eoh
+0000F3h  eol
+0FFFE4h  fcs_call
+000002h  fcs_close_file
+000000h  fcs_create_file
+00000Eh  fcs_delete_file
+00000Ah  fcs_file_info
+00000Ch  fcs_find_file
+00000Fh  fcs_free_space
+000010h  fcs_init_fcs
+000001h  fcs_open_file
+000003h  fcs_read_block
+000005h  fcs_read_byte
+000008h  fcs_read_byte_nd
+00000Dh  fcs_rename_file
+000009h  fcs_seek
+00000Bh  fcs_set_dir
+000007h  fcs_verify_file
+000004h  fcs_write_block
+000006h  fcs_write_byte
+0BF849h  fin
+0BFC87h  font_00_1f
+0BFC90h  font_20_7f
+0BFC8Ah  font_80_9f
+0BFC93h  font_a0_df
+0BFC8Dh  font_e0_ff
+0BFC84h  font_pool_end
+0BFC3Fh  funckey_flag
+0BFC46h  funckey_name
+0BFC45h  funckey_slot
+0000EBh  iisr
+0000FBh  imr
+0BFCD8h  intv_ext
+0BFCC6h  intv_ftimer
+0BFCCFh  intv_onkey
+0BFCD5h  intv_sio_rx
+0BFCD2h  intv_sio_tx
+0BFCDBh  intv_soft
+0BFCC9h  intv_stimer
+0000E6h  iocsw
+0BFD17h  iocswrk
+0FFFE8h  iocs_call
+0FFFDCh  iocs_call3
+000009h  iocs_char_close
+000008h  iocs_char_open
+000022h  iocs_close_file
+000020h  iocs_create_file
+00002Eh  iocs_delete_file
+000003h  iocs_drive_name
+00002Ah  iocs_file_info
+000000h  iocs_find_drive
+00002Ch  iocs_find_file
+000004h  iocs_fmt_drive
+00003Fh  iocs_format
+00002Fh  iocs_free_space
+000001h  iocs_header_addr
+000002h  iocs_header_next
+000005h  iocs_init_all
+000040h  iocs_init_device
+000010h  iocs_media_check
+000011h  iocs_media_param
+000021h  iocs_open_file
+00000Eh  iocs_rd_byte_nd
+00000Ah  iocs_read_block
+00000Ch  iocs_read_byte
+000012h  iocs_read_sector
+00002Dh  iocs_rename_file
+000017h  iocs_sector_addr
+000029h  iocs_seek
+00002Bh  iocs_set_dir
+000016h  iocs_status_read
+000027h  iocs_verify_file
+000015h  iocs_vfy_sect
+00000Bh  iocs_write_block
+00000Dh  iocs_write_byte
+000013h  iocs_wr_sect
+000014h  iocs_wr_vfy_sect
+0000FCh  isr
+0BFCC0h  keymtx_tbl
+0BFCBFh  keyrep
+0BFC2Dh  keytbl_1b
+0BFC39h  keytbl_1b_ctrl
+0BFC33h  keytbl_1b_shift
+0BFC30h  keytbl_2b
+0BFC3Ch  keytbl_2b_ctrl
+0BFC36h  keytbl_2b_shift
+0BFCCCh  keyvct
+0BFC41h  key_hook1
+0BFCC3h  key_hook2
+0000F2h  ki
+0000F0h  ko
+0000F1h  koh
+0000FEh  lcc
+00A004h  lcd1_cmd
+002004h  lcd1_cmd_2000
+00A006h  lcd1_data
+002006h  lcd1_data_2000
+00A007h  lcd1_read
+002007h  lcd1_read_2000
+00A005h  lcd1_stat
+002005h  lcd1_stat_2000
+00A008h  lcd2_cmd
+002008h  lcd2_cmd_2000
+00A00Ah  lcd2_data
+00200Ah  lcd2_data_2000
+00A00Bh  lcd2_read
+00200Bh  lcd2_read_2000
+00A009h  lcd2_stat
+002009h  lcd2_stat_2000
+00A000h  lcd_cmd
+002000h  lcd_cmd_2000
+0BFC9Bh  lcd_crsr_x
+0BFC9Ch  lcd_crsr_y
+00A002h  lcd_data
+002002h  lcd_data_2000
+0BFC9Eh  lcd_height
+0BFCA1h  lcd_mode
+0BFC9Dh  lcd_width
+0BFC2Ah  linprn
+0BF836h  parc
+0BF862h  plein
+0000EDh  px
+0000EEh  py
+0BF822h  rang
+0BF82Ch  rang_ok
+0BFCBBh  repeat_pitch
+0BFCBAh  repeat_wait
+0BFBDFh  res_id
+0BFBE0h  res_n
+0BFB80h  res_tab
+0000F9h  rxd
+0BFCDEh  s1_btm
+0BFC18h  s1_cap
+0BFC1Bh  s1_tail
+0BFC15h  s1_top
+0BFC12h  s2_cap
+0BFC0Fh  s2_top
+0BFC0Ch  s3_cap
+0BFC09h  s3_top
+0000FDh  scr
+0BFC27h  scrn_crsr_x
+0BFC28h  scrn_crsr_y
+0FFFD8h  secure_work_call
+0000DAh  si
+0BFD33h  sio_baud
+0BFD62h  sio_close_data
+0BFD3Bh  sio_crlf
+0BFD3Ch  sio_eof
+0BFD41h  sio_open_ctrl
+0BFD61h  sio_open_data
+0BFD40h  sio_open_wait
+0BFD35h  sio_rx_port_cond
+0BFD36h  sio_rx_port_ctrl
+0BFD34h  sio_setup
+0BFD31h  sio_timer
+0BFD39h  sio_tx_delay
+0BFD37h  sio_tx_port_cond
+0BFD38h  sio_tx_port_ctrl
+0BFCBEh  softint
+0000FFh  ssr
+0BF800h  start
+0BF814h  suite
+0BFCE1h  swork
+0000FAh  txd
+0000CBh  txtbas
+0000F7h  ucr
+0000F8h  usr
+0BFD1Ah  usrwrk
+
+  No fatal error.  Code: 0BF800h - 0BF863h [      100 byte(s)]
