@@ -536,6 +536,25 @@ bloc, puis tranche sur les **rangs** du leurre et de `RAMFILE` — pas sur leurs
 programme fait bouger en s'exécutant. S'il trouve `EXTSLOT.SYS`, il affiche aussi le `POKE` qui le
 délie de `d_link` (partie B).
 
+**Chaque relevé va aussi dans un fichier texte**, avec l'idiome de T484 (`OPEN … FOR OUTPUT`,
+`PRINT #1, L$`). `FOR OUTPUT` écrase le fichier, et `APPEND` refuse un fichier qui n'existe pas
+encore (manuel, entrée `APPEND`) : chaque `RUN` écrit donc **un fichier par état relevé**. Le
+programme reconnaît l'état dans un premier parcours de la chaîne, sans rien écrire, et un `RUN`
+ne peut pas écraser le relevé d'un autre état :
+
+| Fichier | État relevé |
+|---|---|
+| `F:TRAMFA.BAS` | sonde pas encore appelée (relevé **avant**) |
+| `F:TRAMFL.BAS` | leurre posé, pas de `RAMFILE` |
+| `F:TRAMFR.BAS` | leurre **et** `RAMFILE` — le verdict du protocole A |
+| `F:TRAMFX.BAS` | leurre et EXTSLOT, pas de `RAMFILE` |
+| `F:TRAMFY.BAS` | leurre, EXTSLOT **et** `RAMFILE` — le verdict du protocole B |
+
+Chaque fichier porte la zone de résultat de la sonde, la chaîne entière (rang, adresse, nom,
+attribut, taille), `FIN`/`S1BTM`, le verdict, et pour B la ligne `DELIER`. **Un disque `F:` est
+nécessaire** : il est sur la carte (`S2:`), si bien que l'écriture ne touche pas la chaîne de
+`S1:` qu'on mesure.
+
 ### Protocole A — la ROM seule
 
 ⚠️ **Préalables, faute de quoi l'essai devient celui qu'on veut éviter :**
@@ -546,13 +565,16 @@ délie de `d_link` (partie B).
 
 1. `POKE &BFE03,&1A,&FD,&B,0,&C,0 : CALL &FFFD8` — réserver 3072 octets ;
 2. `LOAD M "F:TRAMF.OBJ"`, puis charger `TRAMF.BAS` ;
-3. **`RUN`** — relevé **avant** : « SONDE PAS ENCORE APPELEE », pas de leurre ;
+3. **`RUN`** — relevé **avant** : « SONDE PAS ENCORE APPELEE », pas de leurre → `F:TRAMFA.BAS` ;
 4. ⚠️ **en mode direct**, `CALL &BF000` ;
-5. **`RUN`** — attendu : `ETAPE 6 ERR 0`, et `LEURRE  SYS` **au rang 1**, attribut `25` ;
+5. **`RUN`** — attendu : `ETAPE 6 ERR 0`, et `LEURRE  SYS` **au rang 1**, attribut `25` →
+   `F:TRAMFL.BAS` ;
 6. **en mode direct**, `INIT "E:2K"`, confirmer par `Y` ;
-7. **`RUN`** — le verdict ;
+7. **`RUN`** — le verdict → `F:TRAMFR.BAS` ;
 8. nettoyer, en mode direct : `INIT "E:0K"`, puis `SET "S1:LEURRE.SYS"," "` et
-   `KILL "S1:LEURRE.SYS"`.
+   `KILL "S1:LEURRE.SYS"` ;
+9. **seulement ensuite**, rapatrier `F:TRAMFA.BAS`, `F:TRAMFL.BAS` et `F:TRAMFR.BAS` sur le PC,
+   au besoin par PLINK : il peut s'installer maintenant que l'essai est fini.
 
 ### Protocole B — le contre-essai avec EXTSLOT
 
@@ -568,18 +590,19 @@ Il est réassemblé depuis `extslot.asm`, identique à l'octet à l'objet d'épo
    `0BFBFFh`) ;
 2. `LOAD M "F:EXTSLOT.OBJ"`, `LOAD M "F:TRAMF.OBJ"`, puis charger `TRAMF.BAS` ;
 3. **en mode direct**, `CALL &BF000` — le leurre, au rang 1 ;
-4. **en mode direct**, `CALL &BE000` — attendu : `EXTSLOT V1.02 by E.Kako` / `Installed.`, et
-   `EXTSLOT SYS` **au rang 2**, derrière le leurre ;
-5. **en mode direct**, `INIT "E:2K"`, confirmer par `Y` ;
-6. **`RUN`** — le verdict. Noter aussi la ligne `DELIER : POKE &BFCA2,…` ;
-7. nettoyer, **dans cet ordre**, en mode direct :
+4. **en mode direct**, `CALL &BE000` — attendu : `EXTSLOT V1.02 by E.Kako` / `Installed.` ;
+5. **`RUN`** — `EXTSLOT SYS` **au rang 2**, derrière le leurre → `F:TRAMFX.BAS` ;
+6. **en mode direct**, `INIT "E:2K"`, confirmer par `Y` ;
+7. **`RUN`** — le verdict → `F:TRAMFY.BAS`, avec la ligne `DELIER : POKE &BFCA2,…` ;
+8. nettoyer, **dans cet ordre**, en mode direct :
    1. `INIT "E:0K"` ;
    2. **le `POKE &BFCA2,…` affiché** — il délie EXTSLOT de `d_link`. ⛔ Ne jamais faire de
       `KILL` sur `EXTSLOT.SYS` sans ce `POKE` : `d_link` désignerait de la mémoire libérée. Si
       `TRAMF.BAS` répond « PAS EN TETE DE D_LINK », un autre pilote a été chaîné après EXTSLOT :
       s'arrêter là ;
    3. `SET "S1:EXTSLOT.SYS"," "` puis `KILL "S1:EXTSLOT.SYS"` ;
-   4. `SET "S1:LEURRE.SYS"," "` puis `KILL "S1:LEURRE.SYS"`.
+   4. `SET "S1:LEURRE.SYS"," "` puis `KILL "S1:LEURRE.SYS"` ;
+9. rapatrier `F:TRAMFX.BAS` et `F:TRAMFY.BAS`.
 
 ### Ce que chaque issue apprendrait
 
@@ -609,6 +632,11 @@ effacerait ce qu'il cherche. `TS1T.ASM` (100 octets, en **`0BF800h`**) prend don
 fin de chaîne (même parcours que `SUB_F0278`, **sans** y écrire), `[s1_tail]` et `[s1_btm]`.
 `TS1T.BAS` ne fait que relire les instantanés, après coup. En phase, `s1_tail` = `FIN` + 1.
 
+`TS1T.BAS` écrit aussi son relevé dans **`F:TS1TRES.BAS`**. Il le réécrit à chaque `RUN` avec
+**tous** les instantanés pris jusque-là, si bien que le dernier fichier contient toute la série.
+L'écriture sur `F:` ne fausse pas la mesure : sur le lecteur 1, `SUB_F029D` ne touche pas à
+`s1_tail`.
+
 Zone de résultat : identifiant **`0A6h`** en `0BFBDFh`, nombre d'instantanés (4 au plus) en
 `0BFBE0h`, instantanés de 9 octets à partir de `0BFB80h`. La série repart de zéro dès que
 l'identifiant n'est plus le sien (`POKE &BFBDF,0`).
@@ -624,8 +652,10 @@ nécessaire.
 3. **en mode direct**, `CALL &BF800` — instantané 1, **le témoin** ;
 4. **en mode direct**, `CALL &BF000` (installation), puis **aussitôt** `CALL &BF800` — instantané 2 ;
 5. **`RUN`** — relit 1 et 2 ; en s'exécutant, le programme fait grandir `DATA.BAS` ;
-6. **en mode direct**, `CALL &BF800` — instantané 3, puis **`RUN`** ;
-7. désinstaller comme d'habitude : `CALL &BF000 "-U"`, puis `SET`/`KILL` (`../README.md`).
+6. **en mode direct**, `CALL &BF800` — instantané 3, puis **`RUN`** : `F:TS1TRES.BAS` contient
+   alors les trois instantanés ;
+7. désinstaller comme d'habitude : `CALL &BF000 "-U"`, puis `SET`/`KILL` (`../README.md`) ;
+8. rapatrier `F:TS1TRES.BAS`.
 
 ### Ce que chaque issue apprendrait
 
