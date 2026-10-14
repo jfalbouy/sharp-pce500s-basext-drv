@@ -1,14 +1,16 @@
 ; ============================================================================
 ; BASEXTDR.ASM -- BASEXT residant : un pilote de S1: (projet BASEXT-DRV)
 ; ============================================================================
-; Version 0.2 du 2026-09-16 -- NON EPROUVEE SUR MACHINE.
+; Version 0.3 du 2026-10-14 -- la 0.2 (2026-09-16) est ✅ EPROUVEE SUR PC-E500S
+; REEL le 2026-09-18 ; la 0.3 ajoute le mot-cle DWGL et descend le chargement de
+; 0BE400h a 0BE000h, le bloc ne tenant plus sous 0BF000h (3072 octets).
 ;
-; Les 14 mots-cles de BASEXT (LPEEK ... XCLS) vivent dans un bloc protege de
+; Les 15 mots-cles de BASEXT (LPEEK ... XCLS, DWGL) vivent dans un bloc protege de
 ; S1: (BASEXT.SYS) au lieu de la zone langage machine. Le code des mots-cles
 ; n'est PAS recopie : il est INCLUS depuis C:\Claude\BASEXT\src\BASEXT.ASM.
 ;
 ; SUR LA MACHINE
-;   POKE &BFE03,&1A,&FD,&B,0,&18,0:CALL &FFFD8   reserver 6144 octets (0BE400h)
+;   POKE &BFE03,&1A,&FD,&B,0,&1C,0:CALL &FFFD8   reserver 7168 octets (0BE000h)
 ;   LOAD M "X:BASEXTDR.OBJ"                      (ou F:)
 ;   CALL &BF000                                  installer
 ;   CALL &xxxxx                                  reposer crochets et maillon
@@ -31,8 +33,8 @@
 ;   #### plus bas). Ce fichier n'ecrit que ce qui fait de ce code un pilote :
 ;   en-tetes, bd_arret, bd_reprise, installateur, desinstallateur.
 ;
-; L'OBJET (charge en 0BE400h)
-;   0BE400h  block_top    l'IMAGE du bloc, relogee puis copiee dans S1:
+; L'OBJET (charge en 0BE000h)
+;   0BE000h  block_top    l'IMAGE du bloc, relogee puis copiee dans S1:
 ;            ...          bourrage jusqu'a 0BF000h
 ;   0BF000h  bd_entree    l'installateur (CALL &BF000)
 ;            rel_table    la table de relocation, GENEREE (reloc.inc)
@@ -51,7 +53,7 @@
 ; son org, ni son pre_on. ⛔ DEF, pas EQU : IFNDEF ne voit que DEF.
         def     basext_pilote
 
-        org     0BE400H
+        org     0BE000H
         pre_on                          ; INDISPENSABLE (skill pc-e500s §2.2)
 
 bd_objet:
@@ -145,12 +147,12 @@ bd_rp_present:
 
 ; ############################################################################
 ; ##                                                                        ##
-; ##   LE CODE DES 14 MOTS-CLES N'EST PAS ECRIT DANS CE FICHIER :           ##
+; ##   LE CODE DES 15 MOTS-CLES N'EST PAS ECRIT DANS CE FICHIER :           ##
 ; ##   IL EST INCLUS ICI, DEPUIS C:\Claude\BASEXT\src\BASEXT.ASM            ##
 ; ##                                                                        ##
 ; ##   start, LPEEK, WPEEK, LPOKE, MOD, INSTR, TRIM$, LTRIM$, RTRIM$,       ##
-; ##   UCASE$, LCASE$, REPT$, SREPT$, XCONSOLE, XCLS, le filtre d'ecran,    ##
-; ##   kw_table, disp_table et les variables : environ 2700 octets.         ##
+; ##   UCASE$, LCASE$, REPT$, SREPT$, XCONSOLE, XCLS, DWGL, le filtre,      ##
+; ##   kw_table, disp_table et les variables : environ 3000 octets.         ##
 ; ##   Le code assemble se lit dans BASEXTDR.lst (sans -K).                 ##
 ; ##                                                                        ##
 ; ############################################################################
@@ -163,7 +165,7 @@ block_bottom:
 ; ============================================================================
 ;  BOURRAGE : l'installateur commence en 0BF000h (CALL &BF000)
 ; ============================================================================
-        ds      bd_objet+00C00H-*
+        ds      bd_objet+01000H-*
 
 ; ============================================================================
 ;  L'INSTALLATEUR -- CALL &BF000 installe, CALL &BF000 "-U" desinstalle
@@ -666,7 +668,7 @@ bh_dec:
 ; ----------------------------------------------------------------------------
 bd_reloge:      db      0               ; 1 : image deja relogee
 
-bd_m_titre:     db      'BASEXT-DRV 0.2 (BEXT:)',13,10
+bd_m_titre:     db      'BASEXT-DRV 0.3 (BEXT:)',13,10
 bd_m_titre_f:
 bd_m_ok:        db      'Installed. Hooks: CALL &'
 bd_m_hex:       db      '00000',13,10
@@ -708,8 +710,8 @@ bd_fin:
 ;  adresse absolue ferait echouer reloc.py aux origines B et C)
 ; ============================================================================
         assert  iocs_header-block_top = 022H,'en-tete IOCS hors de +22h'
-        assert  block_bottom-bd_objet <= 00C00H,'bloc trop grand : il deborde sur 0BF000h'
-        assert  bd_entree-bd_objet = 00C00H,'installateur hors de 0BF000h'
-        assert  bd_fin-bd_objet <= 01800H,'objet au-dela du plafond 0BFC00h'
+        assert  block_bottom-bd_objet <= 01000H,'bloc trop grand : il deborde sur 0BF000h'
+        assert  bd_entree-bd_objet = 01000H,'installateur hors de 0BF000h'
+        assert  bd_fin-bd_objet <= 01C00H,'objet au-dela du plafond 0BFC00h'
         assert  bd_nom_f-bd_nom <= 5,'nom de device de plus de 5 octets'
         end

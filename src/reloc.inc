@@ -1,6 +1,6 @@
 ; ============================================================================
 ; reloc.inc -- GENERE par outils/reloc.py, NE PAS EDITER
-; source BASEXTDR.ASM, zone 0BE400h-0BEF16h (2839 octets), 126 champs de 3 octets, 29 de 2
+; source BASEXTDR.ASM, zone 0BE000h-0BEC44h (3141 octets), 145 champs de 3 octets, 36 de 2
 ; verifie par assemblage a trois origines
 ; format Kon/A62 (celui de PLINKC) : delta depuis le champ precedent, le
 ; premier depuis le DEBUT DE LA ZONE ; bit 080h = 3 octets ; 07Eh = delta
@@ -16,10 +16,12 @@ rel_table:
         db      0A1H,099H,086H,09BH,08AH,086H,084H,090H,0A0H,08AH,086H,088H
         db      088H,088H,087H,09BH,088H,08AH,08AH,089H,087H,086H,004H,00FH
         db      085H,004H,011H,00BH,085H,084H,08AH,09CH,00CH,005H,087H,08EH
-        db      0B1H,08EH,088H,084H,084H,09BH,086H,099H,02CH,016H,006H,094H
-        db      0DFH,004H,089H,08BH,084H,084H,092H,006H,083H,087H,006H,083H
-        db      086H,011H,036H,005H,088H,084H,084H,008H,005H,085H,08CH,0F4H
-        db      084H,084H,084H,084H,084H,084H,084H,084H,084H,084H,084H,084H
-        db      084H,0FFH
+        db      0B1H,08EH,088H,084H,084H,09BH,086H,099H,098H,005H,085H,004H
+        db      005H,085H,004H,005H,085H,004H,0A0H,086H,08AH,086H,098H,084H
+        db      08AH,088H,090H,087H,087H,085H,084H,0A7H,006H,022H,016H,006H
+        db      094H,0DFH,004H,089H,08BH,084H,084H,092H,006H,083H,087H,006H
+        db      083H,086H,011H,036H,005H,088H,084H,084H,008H,005H,085H,08CH
+        db      0FAH,084H,084H,084H,084H,084H,084H,084H,084H,084H,084H,084H
+        db      084H,084H,084H,0FFH
 rel_table_end:
         end

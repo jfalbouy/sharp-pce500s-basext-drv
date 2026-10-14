@@ -1,6 +1,6 @@
 # BASEXT-DRV — conception
 
-*Rédigé le 2026-09-16 — mis à jour le 2026-09-25*
+*Rédigé le 2026-09-16 — mis à jour le 2026-10-14*
 
 **Rendre BASEXT résident** : ses mots-clés vivent dans un **bloc de pilote** de `S1:` au lieu
 d'occuper la zone langage machine (`0BF000h`–`0BFC00h`), qui redevient libre pour d'autres
@@ -746,6 +746,85 @@ derrière lui.
 
 ---
 
+## 5quater. La version 0.3 (2026-10-14) — `DWGL`, et le chargement descendu à `0BE000h`
+
+`BASEXT.ASM` a reçu un quinzième mot-clé, **`DWGL colonne,ligne,tag,chaine$`** : la barre de cases
+de la machine, par la commande `58h` du device 0 (`BASEXT/CONCEPTION-DWGL.md` pour l'étude, son
+gabarit au §8.5 du `MODE-EMPLOI.md`). C'est **dans le pilote** qu'elle prend son sens : résidente,
+elle sert n'importe quel programme sans réserver la zone langage machine.
+
+**Ce que l'ajout coûte**, mesuré à l'assemblage :
+
+| | 0.2 | 0.3 |
+|---|---|---|
+| module autonome `BASEXT.OBJ` | 2709 octets | **3011** (`0BF000h`–`0BFBC2h`, 61 libres sous 3072) |
+| bloc résident | 2839 octets | **3141** |
+| objet du pilote | 4536 octets | **5586** |
+| champs de relocation | 155 | **181** |
+
+⛔ **Le bloc ne tenait plus sous l'installateur.** `bd_entree` est en `0BF000h` — l'adresse du
+`CALL` —, et le bloc partait de `0BE400h` : 3072 octets de place pour 3141 demandés. Trois sorties
+possibles : réemployer `xf_buf` comme tampon de libellés (48 octets gagnés, insuffisant et deux
+mots-clés liés), raccourcir le tampon (8 octets gagnés, insuffisant), ou **descendre le
+chargement**. C'est la troisième qui a été prise, à la demande de J.-F. Albouy (« on adapte la
+taille si nécessaire ») :
+
+| | 0.2 | 0.3 |
+|---|---|---|
+| `org` de l'objet | `0BE400h` | **`0BE000h`** |
+| place pour le bloc | `00C00h` = 3072 | **`01000h` = 4096** (955 libres) |
+| réservation sur la machine | 6144 (`&18`) | **7168** (`&1C`) : `POKE &BFE03,&1A,&FD,&B,0,&1C,0` |
+| installateur | `0BF000h` | `0BF000h` — **inchangé** |
+
+Les trois `assert` de disposition ont suivi (`<= 01000H`, `= 01000H`, `<= 01C00H`), ainsi que
+`construire.py` (constante `CHARGE`). Le plafond `0BFC00h` reste respecté : l'objet finit en
+`0BF5D1h`.
+
+✅ **DWGL exécutée dans le bloc relogé.** `BASEXT/essais/DWGLEMU.py` reloge le bloc de
+`BASEXTDR.OBJ` par sa table Kon vers `080018h` — l'adresse du premier essai réel — puis **exécute**
+`dwgl` à cette adresse dans un interpréteur SC62015 réduit, `eval`/`dec2bin`/`iocs_call` simulés
+selon leur contrat. Une vingtaine de cas passent, identiques à ceux du module autonome : les
+`mv x,dw_buf` et `mv y,dw_buf` relogés visent bien le tampon du bloc. Ce n'est pas un essai sur
+machine, mais c'est plus qu'une relecture.
+
+**Vérifié sur PC** par `outils/construire.py` : table de relocation mesurée par double assemblage
+et vérifiée à une troisième origine, table relue **dans l'objet** égale à la mesure, relocation
+simulée vers `0B2345h`, `08F000h` et `0A0010h` identique à l'assemblage à ces adresses, et objet
+**identique à l'octet** à celui du moteur C `xasm2026-1-2`.
+
+✅ **ÉPROUVÉE SUR PC-E500S RÉEL le 2026-10-14** (J.-F. Albouy), le jour même de son écriture.
+L'installateur annonce `BASEXT-DRV 0.3 (BEXT:)` et, au second appel, `Already installed.` /
+`Hooks: CALL &80DD7` : le bloc est en **`080D80h`** (`bd_reprise` = bloc + `57h`), et le test de
+sentinelle refuse proprement la seconde installation. `BASEXT/essais/DWGLTEST.BAS` a ensuite
+tourné **sur les mots-clés du pilote** — `DWGL`, `XCONSOLE` et `XCLS` —, tous conformes.
+
+Ce que cela établit pour la 0.3, au-delà de la 0.2 : le chargement en `0BE000h`, la réservation
+de **7168** octets, la copie d'un bloc de **3141** octets et son **auto-vérification de
+relocation** sur la machine, avec les 181 champs.
+
+**Et la 0.3 est allée jusqu'au bout le même jour** : `DRVTEST.BAS` (`D_LINK : OK`, crochets
+`817D9`), `DWGLTEST.BAS` conforme, `BEXTTEST.BAS` **`*** 15/15 OK ***`**, puis désinstallation
+`CALL &BF000 "-U"` suivie de `SET`/`KILL` : `FILES` ne montre plus `BASEXT.SYS` et
+`REGISTER.SYS` est intact. ✅ **Cohabitation à deux pilotes** relevée au passage :
+`REGISTER.SYS` (3398 affichés) en `080018h`, le nôtre **au-dessus** en `080D80h`
+(`BASEXT .SYS P 3107` = 3141 − `22h`), puis `DATA.BAS` et `TEXT.BAS`.
+
+⛔ **Un `.BAS` d'essai GÉNÉRÉ se périme, et il accuse alors le pilote à tort.** `DRVTEST.BAS`
+porte `K0`, le décalage de `kw_table`, qui change à **chaque** assemblage. Celui de la machine
+datait d'un assemblage antérieur (`K0 = A4Dh`) et a annoncé `CROCHETS : 817D9` au lieu de `OK` —
+alors que `817D9` = `080D80h` + `A59h` est **exactement** la bonne valeur, l'écart de 12 octets
+étant la correction `dw_long` ajoutée entre les deux assemblages. Deux conséquences, prises le
+jour même : la ligne 210 affiche désormais **la valeur attendue à côté de la valeur lue**, une
+ligne 215 rappelle de quel assemblage le `.BAS` est issu, et le `README` dit de **retransférer
+`DRVTEST.BAS` avec l'objet**. La règle générale : un fichier d'essai généré se transporte avec
+ce qu'il mesure, sinon il ment.
+
+⚠️ Le bloc grossit de 302 octets : le refus « `over two pages` » de l'installateur (§4.1) devient
+d'autant plus probable, puisqu'un bloc de 3129 octets a plus de chances qu'un de 2839 d'enjamber
+une frontière de 64 Ko. Le refus est propre — rien n'est copié.
+
+---
+
 ## 6. Plan par étapes
 
 | # | Étape | Critère de fin |
@@ -756,7 +835,8 @@ derrière lui.
 | 4 | ✅ Zone réservée rendue ; petit reset, `OFF`/`ON`, zone à 0, RESET : maillon et crochets conservés (§5ter) | `S1BTM` + 6128 ; `DRVTEST` OK |
 | 5 | ✅ **PC-E500S réel**, avec `PLINK.SYS` déjà installé (§5ter) : insertion derrière `PLINK.SYS`, `BEXTTEST` OK, `ON`/`OFF` OK ; ⚠️ `KILL` d'un pilote **sous** le nôtre : non mesuré, ordre de retrait documenté | |
 | 6 | ✅ Désinstallation puis `SET`/`KILL` (§5ter) | `d_link` `DF820`, crochets `FFFFF` ; bloc retiré, `DATA.BAS` en tête, BASIC recalé |
-| 7 | Dépôt GitHub | poussé |
+| 7 | ✅ Dépôt GitHub | poussé |
+| 8 | **0.3** : `DWGL` ajouté, chargement à `0BE000h`, réservation 7168 (§5quater) | ⚠️ reste à éprouver sur machine : `DRVTEST`, `BEXTTEST` 15/15, `DWGLTEST` |
 
 ---
 

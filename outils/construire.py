@@ -38,7 +38,7 @@ SRC = os.path.normpath(os.path.join(ICI, "..", "src"))
 SOURCE = "BASEXTDR.ASM"
 XASM4 = reloc.XASM_DEFAUT
 XASM_C = r"C:\Claude\xasm2026-1-2\build\xasm2026-1-2.exe"
-CHARGE, ENTREE, PLAFOND = 0x0BE400, 0x0BF000, 0x0BFC00
+CHARGE, ENTREE, PLAFOND = 0x0BE000, 0x0BF000, 0x0BFC00
 
 
 def etape(txt):
@@ -47,7 +47,15 @@ def etape(txt):
 
 def ecrire_drvtest(sym):
     """essais/DRVTEST.BAS, GENERE : les decalages viennent du listing, jamais de la main.
-    PEEK seulement (marche avec ou sans mots-cles) ; CRLF et MAJUSCULES (machine)."""
+    PEEK seulement (marche avec ou sans mots-cles) ; CRLF et MAJUSCULES (machine).
+
+    ⚠️ CE FICHIER PORTE LE DECALAGE DE kw_table, QUI CHANGE A CHAQUE VERSION.
+       Une copie PERIMEE sur la machine annonce un crochet faux alors qu'il est
+       juste. Mesure du 2026-10-14 : le pilote 0.3 installe en 080D80h affichait
+       « CROCHETS : 817D9 », soit exactement bloc + A59h -- le bon ; le .BAS de
+       la machine datait d'un assemblage anterieur (kw_table +A4Dh, 12 octets de
+       moins). D'ou la ligne 210, qui affiche AUSSI la valeur attendue, et la
+       ligne 215, qui rappelle de quel assemblage ce .BAS vient."""
     top = sym["block_top"]
     kw, rep, taille = sym["kw_table"] - top, sym["bd_reprise"] - top, sym["block_bottom"] - top
     lignes = [
@@ -71,7 +79,8 @@ def ecrire_drvtest(sym):
         "180 W=PEEK &BFD0E+PEEK &BFD0F*256+PEEK &BFD10*65536",
         "190 K=PEEK (W+&90)+PEEK (W+&91)*256+PEEK (W+&92)*65536",
         "200 IF K=B+K0 THEN PRINT \"CROCHETS : OK\":GOTO 220",
-        "210 PRINT \"CROCHETS : \";HEX$ K",
+        "210 PRINT \"CROCHETS : \";HEX$ K;\" AU LIEU DE \";HEX$ (B+K0)",
+        "215 PRINT \"CE .BAS EST-IL A JOUR ? KW+&\";HEX$ K0",
         "220 IF D=0 OR K<>B+K0 THEN PRINT \"REPARER : CALL &\";HEX$ (B+R0)",
     ]
     for l in lignes:
@@ -131,7 +140,7 @@ def main():
           f"bd_reprise a +{sym['bd_reprise'] - sym['block_top']:X}h")
     ecrire_drvtest(sym)
     if charge != CHARGE or sym["bd_entree"] != ENTREE or fin > PLAFOND:
-        reloc.erreur("disposition : chargement 0BE400h, entree 0BF000h, fin <= 0BFC00h attendus")
+        reloc.erreur("disposition : chargement 0BE000h, entree 0BF000h, fin <= 0BFC00h attendus")
 
     deb, fbloc = sym["block_top"] - charge, sym["block_bottom"] - charge
     t0, t1 = sym["rel_table"] - charge, sym["rel_table_end"] - charge
